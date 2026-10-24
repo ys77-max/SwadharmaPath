@@ -19,6 +19,11 @@ Archived candidates (candidates.archived_at set) are skipped by every job.
 Run: python scheduler.py           (blocking scheduler)
      python scheduler.py --once    (polling and nightly jobs once, then exit; handy for a smoke test.
                                     The quarterly job is left out so a smoke test never starts a paid AI refresh)
+     python scheduler.py --run polling|nightly|quarterly
+                                   (one group once, then exit; .github/workflows/worker.yml runs the
+                                    worker this way on GitHub Actions instead of an always-on host)
+Set WORKER_PUBLIC_LOGS=true where logs are public (GitHub Actions on a public repo): notification
+titles, which carry candidate names, and tracebacks are left out of the log.
 """
 from __future__ import annotations
 
@@ -40,6 +45,7 @@ log = logging.getLogger("swadharmapath.worker")
 IST = "Asia/Kolkata"
 CHECKPOINTS = {"6m": 182, "12m": 365, "24m": 730}
 OUTLOOK_REVIEW_DAYS = 90
+PUBLIC_LOGS = os.environ.get("WORKER_PUBLIC_LOGS", "").lower() == "true"
 
 
 # ---------------------------------------------------------------- pure helpers
@@ -102,7 +108,10 @@ def job_render_reports(db) -> int:
 def job_deliver(db) -> int:
     rows = db.table("notifications").select("id, user_id, kind, title").is_("sent_at", "null").limit(200).execute().data
     for n in rows:
-        log.info("notify %s %s: %s", n["user_id"], n["kind"], n["title"])
+        if PUBLIC_LOGS:
+            log.info("notify %s", n["kind"])
+        else:
+            log.info("notify %s %s: %s", n["user_id"], n["kind"], n["title"])
         db.table("notifications").update({"sent_at": datetime.now(timezone.utc).isoformat()}).eq("id", n["id"]).execute()
     return len(rows)
 
@@ -208,12 +217,33 @@ def _safe(job, db):
         log.exception("%s failed", job.__name__)
 
 
+GROUPS = {"polling": POLLING, "nightly": NIGHTLY, "quarterly": [job_outlook_refresh]}
+
+
+class _NoTracebacks(logging.Filter):
+    # Public logs: keep the one-line message, drop the traceback (it can quote row data).
+    def filter(self, record):
+        record.exc_info = record.exc_text = None
+        return True
+
+
 def main(argv: list[str]) -> None:
     from db import client
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    if PUBLIC_LOGS:
+        for h in logging.getLogger().handlers:
+            h.addFilter(_NoTracebacks())
     db = client()
     if "--once" in argv:
         for job in POLLING + NIGHTLY:
+            _safe(job, db)
+        return
+    if "--run" in argv:
+        i = argv.index("--run") + 1
+        group = argv[i] if i < len(argv) else ""
+        if group not in GROUPS:
+            sys.exit(f"--run needs one of: {', '.join(GROUPS)}")
+        for job in GROUPS[group]:
             _safe(job, db)
         return
     sched = BlockingScheduler(timezone=IST)

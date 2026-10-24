@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Document | LLD |
-| Version | 1.2 |
+| Version | 1.3 |
 | Last updated | 2026-10-24 |
 | Code baseline | `feat/start-here`: migration, Edge Functions, web app and worker (Start Here scope). |
 | Related | [BRD](../brd/BRD.md) · [HLD](HLD.md) |
@@ -34,8 +34,9 @@
 | `VITE_SUPABASE_URL` | Web (Vercel) | Supabase project URL |
 | `VITE_SUPABASE_ANON_KEY` | Web (Vercel) | Public anon key (RLS applies) |
 | `VITE_DEMO_MODE` | Web | `true` runs the UI on in-memory demo data (also automatic when the two variables above are missing). Never set in production |
-| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Worker (Railway) | Service-role client in `worker/db.py` |
-| `ANTHROPIC_API_KEY` | Worker (Railway), optional | Claude API key for AI library refresh (`worker/library_refresh.py`). Without it AI runs fail with a clear message and the quarterly job sends a reminder instead; CSV refresh still works |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Worker (GitHub Actions secret; `SUPABASE_URL` from repo variable or the production default) | Service-role client in `worker/db.py` |
+| `WORKER_PUBLIC_LOGS` | Worker | `true` on GitHub Actions: `job_deliver` logs only the notification kind, and tracebacks are stripped from log records |
+| `ANTHROPIC_API_KEY` | Worker (GitHub Actions secret), optional | Claude API key for AI library refresh (`worker/library_refresh.py`). Without it AI runs fail with a clear message and the quarterly job sends a reminder instead; CSV refresh still works |
 | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Edge Functions | Provided by the Supabase runtime |
 | Vault `project_url` | Supabase Vault | Base URL used by `private.invoke_edge_function` |
 | Vault `service_role_key` | Supabase Vault | Bearer for Edge Function calls from triggers |
@@ -324,7 +325,7 @@ Every page carries the verbatim disclaimer in the footer. `assemble()` strips `b
 | 02:15 daily | `job_outcome_reminders` | 6 / 12 / 24 months (182 / 365 / 730 days) after `roadmaps.published_at`, with no outcome at that checkpoint → `outcome_<cp>` notification to the counsellor |
 | 1 Jan / Apr / Jul / Oct 09:00 | `job_outlook_refresh` | With `ANTHROPIC_API_KEY` and no open run: inserts a `scheduled` run (scope all). Otherwise careers with `last_reviewed` null or older than 90 days → admin notification pointing to Refresh now / CSV |
 
-Notifications are upserted on (`user_id`, `kind`, `entity_id`) with ignore-duplicates, so repeats are no-ops. Missed roadmap items themselves are marked by the pg_cron job (§5.1). Archived candidates are skipped by `job_refresh_candidates`, `job_outcome_reminders` and `job_library_rematch` (and by `job_report_sla` through `v_caseload`). `python scheduler.py --once` runs the polling and nightly jobs once; it leaves out the quarterly job so a smoke test never starts a paid AI refresh.
+Notifications are upserted on (`user_id`, `kind`, `entity_id`) with ignore-duplicates, so repeats are no-ops. Missed roadmap items themselves are marked by the pg_cron job (§5.1). Archived candidates are skipped by `job_refresh_candidates`, `job_outcome_reminders` and `job_library_rematch` (and by `job_report_sla` through `v_caseload`). `python scheduler.py --once` runs the polling and nightly jobs once; it leaves out the quarterly job so a smoke test never starts a paid AI refresh. `python scheduler.py --run polling|nightly|quarterly` runs one group once; `.github/workflows/worker.yml` uses it on cron `*/15 * * * *`, `45 20 * * *` and `30 3 1 1,4,7,10 *` (UTC), one concurrent run per group, 90-minute timeout. With that host the "every minute" jobs above run every 15 minutes (GitHub may delay scheduled runs by a few minutes).
 
 ### 9.8 Edge Functions
 
@@ -366,3 +367,4 @@ Any change to policies, triggers or RPCs needs a matching SQL test. Regenerate s
 | 1.0 | 2026-10-24 | Baseline from `001_init.sql` and the engine-rule spec |
 | 1.1 | 2026-10-24 | Start Here code landed: Edge Functions, web app, worker. Engine sections now describe the implemented formulas; `next_item` has no expiry grace; report storage path; worker and demo-mode configuration; test suites |
 | 1.2 | 2026-10-24 | Migration 002: library refresh tables, admin RPCs, archiving columns/settings/RPCs, auto-archive cron, `v_caseload` and `assessment_gate` changes; `library_refresh.py` (§9.6), new jobs, `ANTHROPIC_API_KEY`; admin pages; tests |
+| 1.3 | 2026-10-24 | Worker on GitHub Actions: `--run` groups, `WORKER_PUBLIC_LOGS`, `worker.yml` schedule |

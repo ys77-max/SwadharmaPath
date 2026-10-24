@@ -2,7 +2,7 @@
 
 Procedures for developers and the technical owner.
 
-> Last updated 2026-10-24. Library refresh and archiving: Railway `ANTHROPIC_API_KEY`, migration 002, worker jobs and stuck-run handling (SOP-T1, T2, T4, T5).
+> Last updated 2026-10-24. Worker moved to GitHub Actions (free timer) instead of Railway (SOP-T1, T4, T5, T7).
 
 | ID | SOP |
 |---|---|
@@ -22,11 +22,11 @@ Procedures for developers and the technical owner.
 1. Every change goes through a pull request to `main`.
 2. CI must be green, including the **docs check** (code changes need matching `/docs` changes).
 3. Database changes: run `supabase/tests/run.sh` locally; apply to staging first ([SOP-T2](#sop-t2-database-migration)).
-4. Merge. Vercel deploys the web app from `main`. Railway deploys the worker from `main`.
+4. Merge. Vercel deploys the web app from `main`. The worker workflow runs the code on `main` at its next scheduled run.
 5. Smoke test production: login as each role with test accounts, open /me, /family, /cases, /admin; submit a test enquiry.
 6. Note the release in the change history of any doc you changed.
 
-**Rollback:** web — redeploy the previous Vercel deployment; worker — redeploy the previous Railway release; database — write a forward-fixing migration (never edit an applied migration).
+**Rollback:** web — redeploy the previous Vercel deployment; worker — revert the commit on `main` (the next scheduled run uses it) or disable the Worker workflow; database — write a forward-fixing migration (never edit an applied migration).
 
 ### Production environment
 
@@ -34,7 +34,7 @@ Procedures for developers and the technical owner.
 |---|---|---|
 | Database, Auth, Storage, Edge Functions | Supabase project `swadharmapath` (ref `fskmeqrjtwdswaoqwjkh`, region ap-south-1) | `001_init.sql` applied (schema, then seed in parts); `002_library_refresh_archive.sql` to apply with the library refresh and archive release; Edge Functions `score_instrument` (`verify_jwt` off, it checks the caller itself) and `generate_signed_report_url` (`verify_jwt` on) |
 | Web | Vercel project `swadharmapath`, production branch `main` | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` set for production, preview and development |
-| Worker | Railway service from `worker/` (Dockerfile), one instance | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY` (AI library refresh; optional) |
+| Worker | GitHub Actions workflow **Worker** (`.github/workflows/worker.yml`): every 15 minutes, nightly 02:15 IST, quarterly 09:00 IST | Repo secrets `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY` (optional) |
 
 ### First go-live checklist
 
@@ -44,8 +44,8 @@ Procedures for developers and the technical owner.
    ```
    Without it, completed assessments are scored only by the worker's minute poll, not instantly.
 2. Auth → URL configuration: Site URL = the Vercel production URL; add `<production URL>/**` to Redirect URLs.
-3. Railway: new service from the GitHub repo, root directory `worker`, builder Dockerfile, one replica; set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. Check logs for the scheduler start line.
-   Add `ANTHROPIC_API_KEY` (from the Anthropic Console, a key used only for this worker) to turn on **Refresh now with AI** and the quarterly AI refresh. Without it, CSV refresh and archiving still work and the quarterly job only sends a reminder. A full refresh of the seeded library costs roughly ₹500; set a monthly spend limit in the Console.
+3. Worker: GitHub → repo **Settings → Secrets and variables → Actions → New repository secret**: add `SUPABASE_SERVICE_ROLE_KEY` (the Legacy service_role key). Then **Actions → Worker → Run workflow** once and check it goes green. Until the secret exists, runs skip with a notice. (Alternative for minute-level freshness: any Docker host such as Render, root directory `worker`, same variables plus `WORKER_PUBLIC_LOGS` unset; then disable the Worker workflow so jobs don't run twice.)
+   Add a second secret `ANTHROPIC_API_KEY` (from the Anthropic Console, a key used only for this worker) to turn on **Refresh now with AI** and the quarterly AI refresh. Without it, CSV refresh and archiving still work and the quarterly job only sends a reminder. A full refresh of the seeded library costs roughly ₹500; set a monthly spend limit in the Console.
 4. First admin: sign up in the web app, then in the SQL editor run `update public.users set role = 'admin' where email = '<email>';`. Create counsellor accounts from /admin.
 5. Smoke test as in step 5 above.
 
@@ -69,20 +69,21 @@ Procedures for developers and the technical owner.
 
 ## SOP-T4 Worker operations
 
-1. Railway service runs Python 3.12 with the service-role key.
-2. Check logs after deploy for scheduler start and a successful database connection.
-3. If scoring or reports stop: check Railway logs, then Supabase logs for `score_instrument`, then the Vault secrets used by `invoke_edge_function`.
-4. Re-run scoring for a session by re-triggering the worker job for that session (command to be documented when the worker lands).
-5. **Library refresh.** The worker processes one queued run at a time (`job_library_refresh`, every minute) and, after an admin applies a run, recalculates matches (`job_library_rematch`). Logs show `queued scheduled library refresh …`, `library refresh … failed` and per-job counts.
-6. **Stuck refresh.** If the worker restarted mid-run, the run stays `running` and blocks new refreshes. Ask an admin to click **Cancel refresh** on the review page (or run `select public.cancel_library_refresh('<run id>')` as an admin), then start a new one.
-7. **AI refresh failing.** Check that `ANTHROPIC_API_KEY` is set on Railway, the key is active and the Console spend limit is not reached. The run's error shows the reason; individual entries that failed or were declined are listed under "Notes from the check" and the rest of the run still goes to review.
-8. **Auto-archive** runs in the database (`pg_cron` job `swadharmapath-auto-archive`, 02:30 IST), not in the worker. Check `cron.job_run_details` if `archive_settings.last_auto_run_at` stops moving while auto-archive is on.
+1. The worker runs as the GitHub Actions workflow **Worker** (Python 3.12, service-role key from repo secrets). Run it by hand from **Actions → Worker → Run workflow** and pick polling, nightly or quarterly.
+2. Logs are public (public repo), so the workflow sets `WORKER_PUBLIC_LOGS=true`: no names or tracebacks. To debug a failure with full detail, run `python scheduler.py --run polling` locally with the secrets in your shell.
+3. GitHub disables scheduled workflows after 60 days without commits; re-enable from the Actions tab (it emails the owner first).
+4. If scoring or reports stop: check the Worker runs in the Actions tab, then Supabase logs for `score_instrument`, then the Vault secrets used by `invoke_edge_function`.
+5. Re-run scoring for a session by re-triggering the worker job for that session (command to be documented when the worker lands).
+6. **Library refresh.** The worker processes one queued run at a time (`job_library_refresh`, each polling run) and, after an admin applies a run, recalculates matches (`job_library_rematch`). Logs show `queued scheduled library refresh …`, `library refresh … failed` and per-job counts.
+7. **Stuck refresh.** If a worker run was cut off (timeout or GitHub outage), the run stays `running` and blocks new refreshes. Ask an admin to click **Cancel refresh** on the review page (or run `select public.cancel_library_refresh('<run id>')` as an admin), then start a new one.
+8. **AI refresh failing.** Check that the `ANTHROPIC_API_KEY` repo secret is set, the key is active and the Console spend limit is not reached. The run's error shows the reason; individual entries that failed or were declined are listed under "Notes from the check" and the rest of the run still goes to review.
+9. **Auto-archive** runs in the database (`pg_cron` job `swadharmapath-auto-archive`, 02:30 IST), not in the worker. Check `cron.job_run_details` if `archive_settings.last_auto_run_at` stops moving while auto-archive is on.
 
 ## SOP-T5 Secret rotation
 
 1. Rotate the service-role key in Supabase.
-2. Update it in Railway (worker), Edge Function secrets and Vault `service_role_key`.
-3. Rotate `ANTHROPIC_API_KEY` in the Anthropic Console if exposed or when staff with access leave; update it on Railway and redeploy the worker.
+2. Update it in the GitHub repo secret `SUPABASE_SERVICE_ROLE_KEY` (worker), Edge Function secrets and Vault `service_role_key`.
+3. Rotate `ANTHROPIC_API_KEY` in the Anthropic Console if exposed or when staff with access leave; update the GitHub repo secret.
 4. Rotate the anon key only if exposed; update `VITE_SUPABASE_ANON_KEY` in Vercel and redeploy.
 5. Verify scoring (complete a test assessment) and report download.
 
@@ -99,7 +100,7 @@ Never put the service-role key in a `VITE_*` variable or in the repo.
 | Severity | Example | Response |
 |---|---|---|
 | S1 | Swadharma or private notes visible to a family; data leak | Immediately: disable affected route or policy, notify owner, follow [SOP-O14](operations-sops.md#sop-o14-privacy-requests-and-data-incidents) |
-| S2 | Logins, test runner or scoring down | Within 1 hour: diagnose via Vercel, Supabase and Railway logs; roll back if a recent deploy caused it |
+| S2 | Logins, test runner or scoring down | Within 1 hour: diagnose via Vercel, Supabase and GitHub Actions (Worker) logs; roll back if a recent deploy caused it |
 | S3 | A dashboard number wrong, a report layout issue | Next working day |
 
 After any S1/S2: short post-incident note, a test that would have caught it, and doc updates.

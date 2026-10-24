@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Document | BRD |
-| Version | 1.1 |
+| Version | 1.2 |
 | Status | Baseline for V1 (launch) |
 | Last updated | 2026-10-24 |
 | Source | SwadharmaPath PRD (Sections 1, 3, 6, 8–13, 15, 17) as translated into the build prompt |
@@ -257,7 +257,7 @@ IDs are stable; reference them in pull requests and tests.
 
 ## 11. Assumptions, constraints and dependencies
 
-- Hosting: Vercel (web), Supabase (database, auth, storage, Edge Functions), Railway (Python worker).
+- Hosting: Vercel (web), Supabase (database, auth, storage, Edge Functions), GitHub Actions on a timer (Python worker; any Docker host such as Render also works).
 - Instrument items in the seed data are placeholders. Licensed or original validated items and norms must be loaded before launch.
 - Career library and outlook seed content is marked "seed – verify before launch" and must be reviewed by the agency.
 - Revenue is a manual flag in V1.
@@ -306,3 +306,4 @@ All P1 items in Section 4.1 are demonstrable end to end with seed data, and:
 |---|---|---|
 | 1.0 | 2026-10-24 | Baseline from the PRD-derived build specification |
 | 1.1 | 2026-10-24 | Quarterly library refresh by admin (AI-drafted or CSV, approved per change) and admin archiving with an admin-set timeframe: scope items 6 and 13, FR-C5 to FR-C8, FR-D4, FR-D5, BR-11 to BR-13 |
+| 1.2 | 2026-10-24 | Hosting assumption: the worker runs on GitHub Actions (free) instead of Railway |
