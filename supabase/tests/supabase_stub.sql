@@ -51,7 +51,7 @@ grant execute on function storage.foldername(text) to anon, authenticated, servi
 -- vault + pg_net shapes; calls are recorded so tests can assert on them
 create schema vault;
 create table vault.decrypted_secrets (name text primary key, decrypted_secret text);
-insert into vault.decrypted_secrets values ('project_url', 'http://edge.test'), ('service_role_key', 'test-key');
+insert into vault.decrypted_secrets values ('project_url', 'http://edge.test'), ('service_role_key', 'test-key'), ('edge_trigger_secret', 'test-trigger-secret');
 create schema net;
 create table net.calls (id serial primary key, url text, headers jsonb, body jsonb, at timestamptz default now());
 create function net.http_post(url text, headers jsonb, body jsonb) returns bigint language sql as $$

@@ -39,15 +39,11 @@ Procedures for developers and the technical owner.
 
 ### First go-live checklist
 
-1. Vault: `project_url` is set. Add `service_role_key` once, in the Supabase SQL editor (never in the repo or chat):
-   ```sql
-   select vault.create_secret('<service_role key from Project Settings → API keys>', 'service_role_key');
-   ```
-   Without it, completed assessments are scored only by the worker's minute poll, not instantly.
+1. Instant scoring: `project_url` is in Vault, and migration 004 creates the Vault secret `edge_trigger_secret` itself (nobody needs to see or copy it). Check: complete a test assessment, then `select status_code, content from net._http_response order by created desc limit 1;` shows 200. Without the secret, completed assessments are scored only by the worker's 15-minute poll, not instantly.
 2. Auth → URL configuration: Site URL = the Vercel production URL; add `<production URL>/**` to Redirect URLs.
 3. Worker: GitHub → repo **Settings → Secrets and variables → Actions → New repository secret**: add `SUPABASE_SERVICE_ROLE_KEY` (the Legacy service_role key). Then **Actions → Worker → Run workflow** once and check it goes green. Until the secret exists, runs skip with a notice. (Alternative for minute-level freshness: any Docker host such as Render, root directory `worker`, same variables plus `WORKER_PUBLIC_LOGS` unset; then disable the Worker workflow so jobs don't run twice.)
    Add a second secret `ANTHROPIC_API_KEY` (from the Anthropic Console, a key used only for this worker) to turn on **Refresh now with AI** and the quarterly AI refresh. Without it, CSV refresh and archiving still work and the quarterly job only sends a reminder. A full refresh of the seeded library costs roughly ₹500; set a monthly spend limit in the Console.
-4. First admin: the web app has no sign-up screen, so create the account in Supabase: **Authentication → Users → Add user → Create new user**, enter the email and a password, tick **Auto Confirm User**. Then in the SQL editor run `update public.users set role = 'admin' where email = '<email>';`. Create counsellor accounts from /admin.
+4. First admin: the web app has no sign-up screen, so create the account in Supabase: **Authentication → Users → Add user → Create new user**, enter the email and a password, tick **Auto Confirm User**. Then in the SQL editor run `update public.users set role = 'admin' where email = '<email>';`. Counsellor accounts are created the same way, with `role = 'counsellor'` (the Admin counsellors page is not built yet).
 5. Smoke test as in step 5 above.
 
 ## SOP-T2 Database migration
@@ -84,10 +80,11 @@ Procedures for developers and the technical owner.
 ## SOP-T5 Secret rotation
 
 1. Rotate the service-role key in Supabase.
-2. Update it in the GitHub repo secret `SUPABASE_SERVICE_ROLE_KEY` (worker), Edge Function secrets and Vault `service_role_key`.
-3. Rotate `ANTHROPIC_API_KEY` in the Anthropic Console if exposed or when staff with access leave; update the GitHub repo secret.
-4. Rotate the anon key only if exposed; update `VITE_SUPABASE_ANON_KEY` in Vercel and redeploy.
-5. Verify scoring (complete a test assessment) and report download.
+2. Update it in the GitHub repo secret `SUPABASE_SERVICE_ROLE_KEY` (worker), and in Vault `service_role_key` if that secret exists.
+3. Rotate the trigger secret if a database dump or SQL access was exposed: `select vault.update_secret((select id from vault.secrets where name = 'edge_trigger_secret'), encode(extensions.gen_random_bytes(32), 'hex'));`. It takes effect at once, with no other step.
+4. Rotate `ANTHROPIC_API_KEY` in the Anthropic Console if exposed or when staff with access leave; update the GitHub repo secret.
+5. Rotate the anon key only if exposed; update `VITE_SUPABASE_ANON_KEY` in Vercel and redeploy.
+6. Verify scoring (complete a test assessment) and report download.
 
 Never put the service-role key in a `VITE_*` variable or in the repo.
 

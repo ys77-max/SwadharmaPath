@@ -24,6 +24,13 @@ Deno.serve(async (req) => {
 
   const admin = createClient(URL, SERVICE_KEY, { auth: { persistSession: false } })
   const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
+  // The trigger's shared secret lives only in Vault; the database checks it.
+  const triggerSecret = req.headers.get('x-trigger-secret')
+  let fromTrigger = token === SERVICE_KEY
+  if (!fromTrigger && triggerSecret) {
+    const { data: ok } = await admin.rpc('verify_trigger_secret', { p_secret: triggerSecret })
+    fromTrigger = ok === true
+  }
 
   const { data: session, error: sErr } = await admin
     .from('assessment_sessions')
@@ -33,8 +40,8 @@ Deno.serve(async (req) => {
   if (sErr) return json({ error: sErr.message }, 500)
   if (!session) return json({ error: 'session not found' }, 404)
 
-  // Service role (the database trigger) may score anything; a user only their own session.
-  if (token !== SERVICE_KEY) {
+  // The database trigger (trigger secret or service role) may score anything; a user only their own session.
+  if (!fromTrigger) {
     const userClient = createClient(URL, ANON_KEY, { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false } })
     const { data: u } = await userClient.auth.getUser()
     const cand = session.candidates as unknown as { user_id: string } | null

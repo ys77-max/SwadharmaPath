@@ -215,14 +215,14 @@ sequenceDiagram
 | Abuse | Lead form throttled per contact (3/hour) and globally (30/minute). |
 | Library integrity | AI and CSV output is stored as proposals; only `apply_library_refresh` (admin) writes the library, and only whitelisted fields. The worker sends Claude library content only, never candidate data. |
 | Archiving | Admin-only RPCs; no delete anywhere; audited. Archived rows keep every existing policy, so Swadharma isolation and append-only rules are unchanged. |
-| Secrets | Service-role key only in the worker and Edge Function environment and Supabase Vault (`project_url`, `service_role_key`). `ANTHROPIC_API_KEY` only on the worker. Never in `VITE_*` variables. |
+| Secrets | Service-role key only in the worker and Edge Function environment and Supabase Vault (`project_url`, optional `service_role_key`). Trigger calls to Edge Functions carry a dedicated shared secret (Vault `edge_trigger_secret`, generated in the database and checked there by `verify_trigger_secret`), not the service-role key. `ANTHROPIC_API_KEY` only on the worker. Never in `VITE_*` variables. |
 
 ## 6. Deployment view
 
 | Component | Platform | Config |
 |---|---|---|
 | Web | Vercel project `swadharmapath` (team YSS), production branch `main`; `vercel.json` rewrites client routes to `index.html` and sets basic security headers | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
-| Database, Auth, Storage, Edge Functions | Supabase project `SwadharmaPath` (ref `fskmeqrjtwdswaoqwjkh`, ap-south-1) | Migrations in `supabase/migrations`; Vault secrets `project_url`, `service_role_key`; extensions `pgcrypto`, `pg_net`, `pg_cron` |
+| Database, Auth, Storage, Edge Functions | Supabase project `SwadharmaPath` (ref `fskmeqrjtwdswaoqwjkh`, ap-south-1) | Migrations in `supabase/migrations`; Vault secrets `project_url`, `edge_trigger_secret`; extensions `pgcrypto`, `pg_net`, `pg_cron` |
 | Worker | GitHub Actions workflow `worker.yml`: every 15 minutes (polling jobs), 02:15 IST (nightly), 09:00 IST on 1 Jan/Apr/Jul/Oct (quarterly); free on this public repo. Logs are public, so `WORKER_PUBLIC_LOGS=true` keeps names and tracebacks out. `worker/Dockerfile` remains for an always-on host (Render, Railway) if minute-level freshness is needed | Repo secrets `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY` (optional); `SUPABASE_URL` defaults to the production project |
 | Claude API | Anthropic (`claude-opus-5-5` with web search) | Called by the worker only, about ₹15–20 per library entry, roughly ₹500 for a full refresh of the seeded library |
 
@@ -284,4 +284,5 @@ erDiagram
 | 1.2 | 2026-10-24 | Production go-live: Supabase project created and seeded, Edge Functions deployed, Vercel project linked to the repo with `vercel.json` for SPA routing and headers |
 | 1.3 | 2026-10-24 | Library refresh (AI via Claude API or CSV, admin approval, rematch) and archiving (admin timeframe, nightly auto-archive, restore): components, flows 4.4–4.5, jobs, security, deployment (`ANTHROPIC_API_KEY`) |
 | 1.5 | 2026-10-24 | Library expansion (migration 003) and optional demo cases |
+| 1.6 | 2026-10-24 | Instant scoring: the assessment trigger authenticates to `score_instrument` with a dedicated shared secret (migration 004) |
 | 1.4 | 2026-10-24 | Worker hosted on GitHub Actions (timer, public-log mode) instead of Railway; matches and reports refresh every 15 minutes rather than every minute (scoring stays instant through the Edge Function) |

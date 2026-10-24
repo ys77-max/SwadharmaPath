@@ -28,6 +28,7 @@ do $$ begin
 end $$;
 select tests.expect_error($$ select items from instruments $$, 'permission denied');
 select tests.expect_error($$ select * from instruments $$, 'permission denied');
+select tests.expect_error($$ select public.verify_trigger_secret('test-trigger-secret') $$, 'permission denied');
 do $$ begin assert (select count(*) from instruments where track_variant = 'standard') = 6, 'instrument metadata readable'; end $$;
 select tests.expect_error($$ update users set role = 'admin' where id = auth.uid() $$, 'only an admin');
 select tests.expect_error($$ select public.submit_birth_details('10000000-0000-0000-0000-000000000001', null, null, null, null, null, null, null, 'v1') $$, 'not your candidate');
@@ -117,6 +118,7 @@ update assessment_sessions set status = 'in_progress';  -- no candidate UPDATE p
 reset role;
 do $$ begin
   assert (select count(*) from net.calls where url like '%/functions/v1/score_instrument') = 1, 'score_instrument called on completion';
+  assert (select headers->>'x-trigger-secret' from net.calls where url like '%/functions/v1/score_instrument') = 'test-trigger-secret', 'trigger sends its shared secret';
 end $$;
 select set_config('request.jwt.claims', :admin, false); set role authenticated;
 do $$ begin

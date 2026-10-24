@@ -11,6 +11,13 @@ end $$;
 select private.mark_missed_roadmap_items() as missed_again \gset
 do $$ begin assert (select count(*) from notifications) = 2, 'job is idempotent'; end $$;
 
+-- trigger secret check (service role only; see rls_test for the denial)
+do $$ begin
+  assert public.verify_trigger_secret('test-trigger-secret'), 'matching trigger secret accepted';
+  assert not public.verify_trigger_secret('wrong'), 'wrong trigger secret rejected';
+  assert not coalesce(public.verify_trigger_secret(null), false), 'missing trigger secret rejected';
+end $$;
+
 -- even the database owner cannot rewrite history
 select tests.expect_error($$ update audit_log set action = 'x' $$, 'append-only');
 select tests.expect_error($$ delete from swadharma_releases $$, 'append-only');
