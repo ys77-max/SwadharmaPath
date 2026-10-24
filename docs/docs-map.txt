@@ -1,0 +1,12 @@
+# Code path → doc path map used by scripts/check_docs.py.
+# Format: <code glob> | <doc path>[, <doc path> ...]
+# If a changed file matches a glob, at least one of the listed docs must also change in the PR.
+# Any code change at all (outside docs/ and the exempt list in check_docs.py) needs some change under docs/.
+
+supabase/migrations/** | docs/design/LLD.md
+supabase/seed/**       | docs/design/LLD.md
+supabase/functions/**  | docs/design/LLD.md, docs/design/HLD.md
+worker/**              | docs/design/LLD.md
+src/**                 | docs/user-guides/candidate.md, docs/user-guides/parent.md, docs/user-guides/counsellor.md, docs/user-guides/admin.md, docs/troubleshooting/troubleshooting.md, docs/design/LLD.md
+.github/workflows/**   | docs/sops/technical-sops.md, docs/design/HLD.md
+vite.config.ts         | docs/design/HLD.md, docs/design/LLD.md

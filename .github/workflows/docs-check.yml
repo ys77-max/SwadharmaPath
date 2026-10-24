@@ -1,0 +1,25 @@
+name: Docs check
+
+# Every code or spec change must update /docs in the same pull request.
+# See docs/sops/technical-sops.md (SOP-T8).
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  docs-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Require docs updates for code changes
+        env:
+          DOCS_NOT_REQUIRED: ${{ contains(github.event.pull_request.labels.*.name, 'docs-not-required') }}
+        run: python3 scripts/check_docs.py "origin/${{ github.base_ref }}"
