@@ -79,6 +79,9 @@ Reports cannot be edited. Generate again to create a new version.
 ### T-26 Family cannot see a case file
 Case files are counsellor-only by design. Generate a candidate, candidate_junior, parent or stream_choice report for families.
 
+### T-27a Streams from another board, or every board, are suggested
+Streams follow the **Board** on the case. A blank board, or one the library does not recognise (for example a misspelling), ranks every board's streams. Correct the board (ICSE/ISC, CBSE, a state board name, NIOS, IB, Cambridge) and the list narrows at the next matching run.
+
 ### T-27 Swadharma tab is empty
 The candidate did not opt in, or the engine has not run yet (the worker checks every minute once consent and birth place coordinates exist). If birth time is unknown, expect only Moon-sign and strength components and confidence "low".
 
@@ -127,6 +130,12 @@ Cutoffs must be at least 30 days in the past. Candidates with a session booked, 
 
 ### T-41 `pg_net` / `pg_cron` not available notice
 Expected on plain Postgres; the migration skips them. On Supabase, enable both extensions.
+
+### T-43a A demo login says "Invalid login credentials" or the account is banned
+Demo accounts exist only after the demo SQL has been run ([SOP-T9](../sops/technical-sops.md#sop-t9-demo-cases)), all with the password chosen then. After removal, any demo account that could not be deleted is disabled on purpose.
+
+### T-43b A demo case shows scores but no matches or streams
+Scores come from the Edge Function at once; profiles and matches wait for the next Worker run (every 15 minutes). Run **Actions → Worker → polling** to do it now.
 
 ### T-43 The app shows demo people (Ananya, Meera) instead of real data
 The web build has no `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`, or `VITE_DEMO_MODE=true`. Set the variables in Vercel and redeploy.

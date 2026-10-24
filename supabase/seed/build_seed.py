@@ -1,8 +1,12 @@
-"""Regenerates the seed block at the end of supabase/migrations/001_init.sql.
+"""Regenerates the generated seed SQL.
 
     python3 supabase/seed/build_seed.py
 
-Everything after the "-- BEGIN GENERATED SEED" marker is replaced.
+* supabase/migrations/001_init.sql: everything after the "-- BEGIN GENERATED SEED" marker
+  (the first 20 careers, 8 CBSE streams and the instruments) is replaced.
+* supabase/migrations/003_library_expansion.sql is rewritten with the rest of the library
+  (library_more.py). Each row is inserted only when no career / stream of that name exists,
+  so the migration is safe on a database where admins have already edited the library.
 """
 import json
 import pathlib
@@ -11,9 +15,10 @@ import sys
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from instruments import all_instruments  # noqa: E402
-from library import CAREERS, OUTLOOK_SOURCE, SEED_SOURCE, STREAMS  # noqa: E402
+from library import CAREERS_V1, MORE_CAREERS, MORE_STREAMS, OUTLOOK_SOURCE, SEED_SOURCE, STREAMS_V1  # noqa: E402
 
 MIGRATION = HERE.parent / "migrations" / "001_init.sql"
+EXPANSION = HERE.parent / "migrations" / "003_library_expansion.sql"
 MARKER = "-- BEGIN GENERATED SEED (supabase/seed/build_seed.py)"
 
 
@@ -41,28 +46,37 @@ def num_array(xs):
     return "array[" + ", ".join(repr(x) for x in xs) + "]::numeric[]"
 
 
+def career_sql(c, only_new=False):
+    cols = ("    description, day_in_life, typical_entry_paths, india_salary_band, outlook, automation_exposure, adjacent_emerging, sources, last_reviewed)\n")
+    vals = (f"{lit(c['name'])}, {lit(c['family'])}, {lit(c['riasec_code'])}, {num_array(c['interest_weights'])},\n"
+            f"    {js(c['aptitude_min'])}, {js(c['workstyle_fit'])}, {js(c['values_fit'])},\n"
+            f"    {lit(c['description'])},\n    {lit(c['day_in_life'])},\n"
+            f"    {js(c['typical_entry_paths'])}, {js(c['india_salary_band'])}, {lit(c['outlook'])}, {lit(c['automation_exposure'])},\n"
+            f"    {text_array(c['adjacent_emerging'])}, {js({'content': SEED_SOURCE, 'outlook': OUTLOOK_SOURCE})}, null")
+    head = ("with c as (\n  insert into public.careers (name, family, riasec_code, interest_weights, aptitude_min, workstyle_fit, values_fit,\n" + cols)
+    if only_new:
+        head += f"  select {vals}\n  where not exists (select 1 from public.careers where name = {lit(c['name'])})\n"
+    else:
+        head += f"  values ({vals})\n"
+    out = [head + "  returning id)\n"
+           "insert into public.education_pathways (career_id, level, stream_required, exams, degrees, institutions, duration, alternative_routes, notes)\nselect c.id, v.* from c, (values"]
+    rows = [f"  ({lit(p['level'])}, {lit(p['stream_required'])}, {js(p['exams'])}, {text_array(p['degrees'])}, "
+            f"{js(p['institutions'])}, {lit(p['duration'])}, {lit(p['alternative_routes'])}, {lit(p['notes'])})" for p in c["pathways"]]
+    out.append(",\n".join(rows) + "\n) as v(level, stream_required, exams, degrees, institutions, duration, alternative_routes, notes);\n")
+    return "\n".join(out)
+
+
+def stream_row(s):
+    return (f"  ({lit(s['name'])}, {lit(s['board'])}, {text_array(s['subjects'])}, {text_array(s['keeps_open'])}, "
+            f"{text_array(s['closes'])}, {lit(s['notes'])})")
+
+
 def build():
     out = [MARKER, "", "-- Career library (20) with education pathways"]
-    for c in CAREERS:
-        out.append("with c as (\n  insert into public.careers (name, family, riasec_code, interest_weights, aptitude_min, workstyle_fit, values_fit,\n"
-                   "    description, day_in_life, typical_entry_paths, india_salary_band, outlook, automation_exposure, adjacent_emerging, sources, last_reviewed)\n"
-                   f"  values ({lit(c['name'])}, {lit(c['family'])}, {lit(c['riasec_code'])}, {num_array(c['interest_weights'])},\n"
-                   f"    {js(c['aptitude_min'])}, {js(c['workstyle_fit'])}, {js(c['values_fit'])},\n"
-                   f"    {lit(c['description'])},\n    {lit(c['day_in_life'])},\n"
-                   f"    {js(c['typical_entry_paths'])}, {js(c['india_salary_band'])}, {lit(c['outlook'])}, {lit(c['automation_exposure'])},\n"
-                   f"    {text_array(c['adjacent_emerging'])}, {js({'content': SEED_SOURCE, 'outlook': OUTLOOK_SOURCE})}, null)\n"
-                   "  returning id)\n"
-                   "insert into public.education_pathways (career_id, level, stream_required, exams, degrees, institutions, duration, alternative_routes, notes)\nselect c.id, v.* from c, (values")
-        rows = []
-        for p in c["pathways"]:
-            rows.append(f"  ({lit(p['level'])}, {lit(p['stream_required'])}, {js(p['exams'])}, {text_array(p['degrees'])}, "
-                        f"{js(p['institutions'])}, {lit(p['duration'])}, {lit(p['alternative_routes'])}, {lit(p['notes'])})")
-        out.append(",\n".join(rows) + "\n) as v(level, stream_required, exams, degrees, institutions, duration, alternative_routes, notes);\n")
-
+    out += [career_sql(c) for c in CAREERS_V1]
     out.append("-- CBSE stream options (8)")
     out.append("insert into public.stream_options (name, board, subjects, keeps_open_families, closes_families, notes) values")
-    out.append(",\n".join(f"  ({lit(s['name'])}, {lit(s['board'])}, {text_array(s['subjects'])}, {text_array(s['keeps_open'])}, "
-                          f"{text_array(s['closes'])}, {lit(s['notes'])})" for s in STREAMS) + ";\n")
+    out.append(",\n".join(stream_row(s) for s in STREAMS_V1) + ";\n")
 
     out.append("-- Instruments: one junior and one standard version each (placeholder items)")
     for i in all_instruments():
@@ -72,11 +86,30 @@ def build():
     return "\n".join(out)
 
 
+def build_expansion():
+    out = ["-- 003 Library expansion. GENERATED by supabase/seed/build_seed.py from supabase/seed/library_more.py; do not edit by hand.",
+           f"-- Adds {len(MORE_CAREERS)} careers (with education pathways) and {len(MORE_STREAMS)} stream options for CBSE, CISCE,",
+           "-- state boards, NIOS, IB, Cambridge and the after-Class-10 polytechnic and ITI routes.",
+           "-- A row is skipped when the library already has a career / stream with that name, so admin edits are kept.",
+           "-- New rows are seed content (last_reviewed null): the quarterly refresh or a CSV review verifies them.",
+           "", "begin;", ""]
+    out += [career_sql(c, only_new=True) for c in MORE_CAREERS]
+    out.append("insert into public.stream_options (name, board, subjects, keeps_open_families, closes_families, notes, sources)")
+    out.append("select v.name, v.board, v.subjects, v.keeps_open_families, v.closes_families, v.notes, "
+               + js(SEED_SOURCE) + "\nfrom (values")
+    out.append(",\n".join(stream_row(s) for s in MORE_STREAMS))
+    out.append(") as v(name, board, subjects, keeps_open_families, closes_families, notes)\n"
+               "where not exists (select 1 from public.stream_options o where o.name = v.name);\n")
+    out.append("commit;\n")
+    return "\n".join(out)
+
+
 def main():
     sql = MIGRATION.read_text()
     head = sql.split(MARKER)[0].rstrip() + "\n\n"
     MIGRATION.write_text(head + build())
-    print(f"wrote seed block to {MIGRATION}")
+    EXPANSION.write_text(build_expansion())
+    print(f"wrote seed block to {MIGRATION} and {EXPANSION}")
 
 
 if __name__ == "__main__":

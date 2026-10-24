@@ -104,3 +104,36 @@ def test_streams_follow_subject_strength():
     assert names.index("Arts, Design & Vocational") < names.index("Science - PCM") if "Science - PCM" in names else True
     assert streams.academics_fit({"maths": {"marks_pct": 100, "enjoyment": 5}}, "Science - PCM") == 1
     assert streams.academics_fit({}, "Humanities") == 0.5
+
+
+@pytest.mark.parametrize("raw, board", [
+    ("CBSE", "CBSE"), ("icse", "CISCE"), ("ISC", "CISCE"), ("Maharashtra State Board (HSC)", "State Board"),
+    ("Karnataka PUC", "State Board"), ("NIOS", "NIOS"), ("IB", "IB"), ("Cambridge IGCSE", "Cambridge"), ("", None), (None, None),
+])
+def test_normalise_board(raw, board):
+    assert streams.normalise_board(raw) == board
+
+
+def test_streams_are_limited_to_the_candidates_board():
+    for raw, board in (("CBSE", "CBSE"), ("ICSE", "CISCE"), ("Telangana State Board", "State Board")):
+        top = streams.rank_streams({"board": raw}, STREAMS, {})
+        boards = {next(s["board"] for s in STREAMS if s["id"] == r["stream_option_id"]) for r in top}
+        assert boards <= {board, "Any board"}, (raw, boards)
+        assert all(r["breakdown"]["board"] == 5 for r in top)
+    every = {s["id"] for s in STREAMS}
+    assert {s["id"] for s in streams.for_board(STREAMS, None)} == every
+    assert {s["id"] for s in streams.for_board(STREAMS, "Some new board")} == every
+
+
+def test_every_school_stream_has_aptitude_and_subject_keys():
+    # Streams fall back to a neutral 0.5 when no key matches; only the broad IB / Cambridge / vocational routes may do that.
+    neutral_ok = ("IB Diploma", "Cambridge", "Vocational", "ITI Trade")
+    for s in library.STREAMS:
+        if s["name"].startswith(neutral_ok):
+            continue
+        assert streams._lookup(streams.APTITUDE_PAIRS, s["name"]), s["name"]
+        if not s["name"].startswith(("Arts, Design", "Vocational", "State Board Vocational")):
+            assert streams._lookup(streams.STREAM_SUBJECTS, s["name"]), s["name"]
+    assert streams._lookup(streams.STREAM_SUBJECTS, "ISC Humanities") == ["social_science", "languages"]
+    assert streams._lookup(streams.STREAM_SUBJECTS, "Commerce with Applied Mathematics")[0] == "maths"
+    assert streams._lookup(streams.STREAM_SUBJECTS, "Humanities with Fine Arts / Music")[0] == "art"

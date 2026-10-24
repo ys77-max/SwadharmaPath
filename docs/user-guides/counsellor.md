@@ -46,6 +46,7 @@ Never use Swadharma to rule out a career, and never discuss health, marriage, lo
 - Each row shows the fit score and a breakdown bar (interest, aptitude, work style, values, outlook, feasibility; for streams: interest, aptitude, academics, breadth, board). The 🔒 Swadharma column is for you only.
 - **Pin**, **Hide** or **Add from library**, then switch **Publish to candidate** on. Re-running the matcher keeps your pins, hides and additions. Hidden options never show to the family. Swadharma points are stripped from everything the family sees.
 - For early explorers, keep the widest "keep options open" stream in the list and never present a single career.
+- Streams are suggested from the candidate's board (the **Board** on the Overview tab) plus polytechnic and ITI. If the board is blank or unusual, streams from every board are ranked; correct the board and the next matching run narrows the list. **Add from library** can still add any stream.
 
 ### Sessions
 Schedule (video, in person, phone) with a meeting URL. Pick the ICCC stage and press **Insert template** to start your notes from it. **Private notes** are never visible to the family; write what they should see in **Summary for candidate** and add action items.

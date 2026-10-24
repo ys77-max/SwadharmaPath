@@ -2,7 +2,7 @@
 
 Procedures for developers and the technical owner.
 
-> Last updated 2026-10-24. Worker moved to GitHub Actions (free timer) instead of Railway (SOP-T1, T4, T5, T7). First admin is created in Supabase Auth, not by signing up (SOP-T1 step 4).
+> Last updated 2026-10-24. Worker moved to GitHub Actions (free timer) instead of Railway (SOP-T1, T4, T5, T7). First admin is created in Supabase Auth, not by signing up (SOP-T1 step 4). Library expansion (SOP-T3) and demo cases (SOP-T9).
 
 | ID | SOP |
 |---|---|
@@ -14,6 +14,7 @@ Procedures for developers and the technical owner.
 | T6 | [Backup and restore](#sop-t6-backup-and-restore) |
 | T7 | [Incident response](#sop-t7-incident-response) |
 | T8 | [Documentation maintenance](#sop-t8-documentation-maintenance) |
+| T9 | [Demo cases](#sop-t9-demo-cases) |
 
 ---
 
@@ -63,9 +64,10 @@ Procedures for developers and the technical owner.
 
 ## SOP-T3 Regenerating seed data
 
-1. Edit `supabase/seed/library.py` (careers, streams) or `supabase/seed/instruments.py`.
-2. Run `python3 supabase/seed/build_seed.py`. It rewrites everything after `-- BEGIN GENERATED SEED` in the migration.
-3. Run the SQL tests. Commit the generated SQL with the source change.
+1. Add new careers and streams to `supabase/seed/library_more.py`; edit `supabase/seed/instruments.py` for instruments. Leave the first 20 careers and 8 streams in `library.py` as they are: they were seeded by `001_init.sql`, which is already applied in production.
+2. Run `python3 supabase/seed/build_seed.py`. It rewrites the seed block of `001_init.sql` (which must not change; check `git diff`) and all of `003_library_expansion.sql`.
+3. Run the worker tests (every entry is validated like a CSV upload) and the SQL tests. Commit the generated SQL with the source change.
+4. To add library content to a live database after 003 has run, write a new migration (rows insert only when the name is new), or let admins add rows with **Upload edited CSV** so each new entry is reviewed.
 
 ## SOP-T4 Worker operations
 
@@ -104,6 +106,38 @@ Never put the service-role key in a `VITE_*` variable or in the repo.
 | S3 | A dashboard number wrong, a report layout issue | Next working day |
 
 After any S1/S2: short post-incident note, a test that would have caught it, and doc updates.
+
+## SOP-T9 Demo cases
+
+Demo cases let staff try every screen without real families. They live in the live database, so remove them before real candidates arrive, or keep them archived.
+
+**What gets created** (all addresses end in `@example.com`, names start with "Demo" or "Test"):
+
+| Login | Who | State |
+|---|---|---|
+| `demo.counsellor@example.com` | Demo Counsellor (Meera), role counsellor | Assigned to every demo case |
+| `demo.class9@example.com` | Aarav, Class 9, CBSE, early explorer | All six junior activities done, subject marks, one session held, one booked |
+| `demo.class10@example.com` | Ananya, Class 10, ICSE, early explorer | Same |
+| `demo.class11@example.com` | Rohan, Class 11 Science (PCM + CS), CBSE | All six standard assessments done, sessions |
+| `demo.class12@example.com` | Kavya, Class 12 Commerce with Maths, Telangana board | Same |
+| `demo.earlycareer@example.com` | Neha, 2 years in accounts | Same |
+| `demo.midcareer@example.com` | Vikram, 12 years in manufacturing | Same |
+| `test.junior@example.com` | Test Junior Candidate, Class 8 | Nothing taken: try the junior activities yourself |
+| `test.senior@example.com` | Test Senior Candidate, 5 years' experience | Nothing taken: try the standard assessments yourself |
+
+Disclaimer and guardian consent are pre-recorded for every demo candidate, because the onboarding screen is not built yet.
+
+**Load**
+
+1. Pick one password for all demo accounts (at least 8 characters). Do not reuse a real password; it will be shared with testers.
+2. `python3 supabase/seed/build_demo.py --password '<password>' > /tmp/demo.sql`, or take `supabase/seed/demo_cases.sql` and replace `__DEMO_PASSWORD__` with the password
+3. Run the file in the Supabase SQL editor. It is safe to run twice.
+4. Scores appear within seconds (the Edge Function); profiles, career matches and stream suggestions appear after the next Worker run (every 15 minutes, or run **Actions → Worker** by hand).
+
+**Remove**
+
+1. `python3 supabase/seed/build_demo.py --remove > /tmp/remove_demo.sql` and run it in the SQL editor.
+2. Every demo login is disabled and every demo case archived first. Cases and accounts are then deleted, except a case that has a generated report and an account named in the audit log: those stay archived and disabled, because reports and the audit log are append-only.
 
 ## SOP-T8 Documentation maintenance
 
