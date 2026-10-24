@@ -31,10 +31,15 @@ The public form is rate-limited: the same phone or email can submit 3 times an h
 - There is no public sign-up screen. Every new account starts as a candidate until an admin changes its role.
 - To create a counsellor or admin, add or invite the user in Supabase (**Authentication → Users → Add user**) and then change their role. Only an admin can change a role, and the change is enforced in the database.
 
+### 3.1 Demo cases
+For training and testing, the technical owner can load demo cases: a demo counsellor, six candidates from Class 9 to mid-career with completed assessments, and two fresh test candidates whose assessments you take yourself ([SOP-T9](../sops/technical-sops.md#sop-t9-demo-cases)). They show in **Cases** like real ones; their names start with "Demo" or "Test". Ask for them to be removed before real families start.
+
 ## 4. Counsellors (/admin/counsellors)
 Caseload and report SLA per counsellor. Reassign candidates when someone is overloaded or on leave.
 
 ## 5. Careers & streams library (/admin/careers, /admin/streams)
+
+The library holds about 150 careers across all 15 families (professional, government, creative, vocational and skilled trades) and stream options for CBSE, CISCE (ISC), state boards, NIOS, IB and Cambridge, plus the polytechnic and ITI routes after Class 10. Early explorers only see the streams of the board on their case, plus polytechnic and ITI.
 
 The **Library** page lists every career and stream with its **last reviewed** date. Entries never reviewed, or not reviewed in 90 days, are flagged in amber. Seed content is marked "seed – verify before launch" and should be reviewed with the first refresh.
 

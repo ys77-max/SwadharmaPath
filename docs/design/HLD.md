@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Document | HLD |
-| Version | 1.4 |
+| Version | 1.5 |
 | Last updated | 2026-10-24 |
 | Code baseline | `feat/start-here`: database, Edge Functions, web app (Start Here routes) and worker. |
 | Related | [BRD](../brd/BRD.md) · [LLD](LLD.md) |
@@ -77,7 +77,7 @@ flowchart TB
 
 Route guard: everything except the public routes needs a session; after login the user is sent to the home for `users.role` (`/me`, `/family`, `/cases`, `/admin`). Supabase client: `src/lib/supabase.ts`, configured from `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. All data access goes through one `Api` interface with a Supabase implementation and an in-memory demo implementation; demo mode (`VITE_DEMO_MODE=true`, or no Supabase variables) lets reviewers click through every role without a backend.
 
-### 3.2 Supabase database (*implemented in `supabase/migrations/001_init.sql` and `002_library_refresh_archive.sql`*)
+### 3.2 Supabase database (*implemented in `supabase/migrations/001_init.sql`, `002_library_refresh_archive.sql` and `003_library_expansion.sql`*)
 
 - 27 tables (23 from the spec plus `notifications`, `library_refresh_runs`, `library_refresh_proposals`, `archive_settings`), all with RLS.
 - `private` schema of `SECURITY DEFINER` helper functions used by policies so they never recurse.
@@ -86,7 +86,8 @@ Route guard: everything except the public routes needs a session; after login th
 - Candidate RPCs: `my_instruments`, `next_item`, `save_responses`, `complete_assessment`, `accept_disclaimer`, `give_guardian_consent`, `submit_birth_details`.
 - Admin RPCs: library refresh (`request_library_refresh`, `cancel_library_refresh`, `decide_refresh_proposal`, `apply_library_refresh`) and archiving (`archive_preview`, `archive_inactive`, `restore_archived`, `save_archive_settings`).
 - Triggers for signup, role guard, lead rate limit, under-18 gate, scoring call, roadmap guard, report immutability and versioning, Swadharma release and append-only tables.
-- Seed data: 20 careers with pathways, 8 CBSE stream options, junior and standard instrument versions with placeholder items.
+- Seed data: 148 careers with pathways across the 15 families and 43 stream options (CBSE, CISCE, state boards, NIOS, IB, Cambridge, polytechnic and ITI): 20 careers and 8 streams in 001, the rest in 003. Junior and standard instrument versions with placeholder items.
+- Demo cases (optional, `supabase/seed/build_demo.py`): sign-in accounts for a demo counsellor, six candidates from Class 9 to mid-career with completed assessments, and two fresh test candidates. Loaded and removed by SQL ([SOP-T9](../sops/technical-sops.md#sop-t9-demo-cases)).
 
 ### 3.3 Edge Functions (*implemented*)
 
@@ -282,4 +283,5 @@ erDiagram
 | 1.1 | 2026-10-24 | Edge Functions, web app (Start Here routes, demo mode) and worker implemented; worker variables, schedule and deployment confirmed |
 | 1.2 | 2026-10-24 | Production go-live: Supabase project created and seeded, Edge Functions deployed, Vercel project linked to the repo with `vercel.json` for SPA routing and headers |
 | 1.3 | 2026-10-24 | Library refresh (AI via Claude API or CSV, admin approval, rematch) and archiving (admin timeframe, nightly auto-archive, restore): components, flows 4.4–4.5, jobs, security, deployment (`ANTHROPIC_API_KEY`) |
+| 1.5 | 2026-10-24 | Library expansion (migration 003) and optional demo cases |
 | 1.4 | 2026-10-24 | Worker hosted on GitHub Actions (timer, public-log mode) instead of Railway; matches and reports refresh every 15 minutes rather than every minute (scoring stays instant through the Edge Function) |

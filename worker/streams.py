@@ -3,9 +3,11 @@
 stream_fit = 35·interest alignment + 30·aptitude fit + 20·academics & subject enjoyment
              + 10·breadth + 5·board availability
 
-The widest "keep options open" combination is always included. Output is
-streams with keeps-open / closes lists and sample careers per open family;
-never a single career.
+Only streams of the candidate's board are ranked, plus routes open to any board
+(polytechnic, ITI); with no board, or a board the library has no streams for,
+every stream is ranked. The widest "keep options open" combination is always
+included. Output is streams with keeps-open / closes lists and sample careers
+per open family; never a single career.
 """
 from __future__ import annotations
 
@@ -14,26 +16,64 @@ from typing import Any
 from families import FAMILY_RIASEC
 from match import cosine
 
-STREAM_VERSION = "streams-0.1"
+STREAM_VERSION = "streams-0.2"
+ANY_BOARD = "Any board"
+# First case-insensitive substring match of the stream name wins, so order matters.
 APTITUDE_PAIRS = [
     ("PCMB", ["numerical", "abstract", "verbal"]),
     ("PCM", ["numerical", "abstract"]),
     ("PCB", ["verbal", "abstract"]),
+    ("NIOS Science", ["numerical", "abstract"]),
     ("Commerce", ["numerical", "verbal"]),
+    ("Fine Arts", ["spatial", "verbal"]),
     ("Humanities", ["verbal", "abstract"]),
     ("Design", ["spatial", "abstract"]),
     ("Vocational", ["spatial", "abstract"]),
+    ("Polytechnic", ["numerical", "spatial"]),
+    ("ITI Trade", ["spatial", "abstract"]),
 ]
 STREAM_SUBJECTS = [
     ("PCMB", ["maths", "science"]),
     ("PCM", ["maths", "science"]),
     ("PCB", ["science", "languages"]),
+    ("NIOS Science", ["maths", "science"]),
     ("Commerce with Mathematics", ["maths", "social_science"]),
+    ("Commerce with Applied Mathematics", ["maths", "social_science"]),
     ("Commerce", ["social_science", "languages"]),
     ("Humanities with Mathematics", ["social_science", "languages", "maths"]),
+    ("Fine Arts", ["art", "languages"]),
     ("Humanities", ["social_science", "languages"]),
     ("Design", ["art"]),
+    ("Polytechnic", ["maths", "science"]),
 ]
+# Free-text board -> the board names used in stream_options.
+BOARD_KEYWORDS = [
+    ("CISCE", ["cisce", "icse", "isc"]),
+    ("CBSE", ["cbse"]),
+    ("NIOS", ["nios", "open school"]),
+    ("IB", ["ib ", "ibdp", "international baccalaureate"]),
+    ("Cambridge", ["cambridge", "igcse", "a level"]),
+    ("State Board", ["state", "puc", "hsc", "ssc", "sslc", "board of secondary", "board of intermediate", "bseb", "tsbie", "bieap",
+                     "maharashtra", "karnataka", "tamil", "kerala", "telangana", "andhra", "gujarat", "rajasthan", "up board",
+                     "bengal", "punjab", "bihar", "mp board", "odisha", "assam", "haryana", "jharkhand", "chhattisgarh"]),
+]
+
+
+def normalise_board(board: str | None) -> str | None:
+    b = f" {(board or '').strip().lower()} "
+    if not b.strip():
+        return None
+    if b.strip() == "ib":
+        return "IB"
+    return next((name for name, keys in BOARD_KEYWORDS if any(k in b for k in keys)), None)
+
+
+def for_board(streams: list[dict], board: str | None) -> list[dict]:
+    """The candidate's board's streams plus any-board routes; all streams if the board is unknown or has none."""
+    b = normalise_board(board)
+    if not b or not any(s.get("board") == b for s in streams):
+        return streams
+    return [s for s in streams if s.get("board") in (b, ANY_BOARD)]
 
 
 def _lookup(table: list[tuple[str, list[str]]], name: str) -> list[str]:
@@ -74,6 +114,8 @@ def academics_fit(subjects: dict[str, dict[str, Any]], stream_name: str) -> floa
 
 def rank_streams(profile: dict, streams: list[dict], careers_by_family: dict[str, list[str]],
                  swadharma_points: dict[str, float] | None = None) -> list[dict]:
+    streams = for_board(streams, profile.get("board"))
+    board = normalise_board(profile.get("board"))
     max_open = max((len(s["keeps_open_families"]) for s in streams), default=1) or 1
     out = []
     for s in streams:
@@ -81,7 +123,7 @@ def rank_streams(profile: dict, streams: list[dict], careers_by_family: dict[str
         a = aptitude_fit(profile.get("aptitude_percentiles") or {}, s["name"])
         ac = academics_fit(profile.get("subjects") or {}, s["name"])
         br = len(s["keeps_open_families"]) / max_open
-        bo = 1.0 if not profile.get("board") or s.get("board") == profile.get("board") else 0.0
+        bo = 1.0 if not board or s.get("board") in (board, ANY_BOARD) else 0.0
         parts = {"interest": round(35 * i, 1), "aptitude": round(30 * a, 1), "academics": round(20 * ac, 1),
                  "breadth": round(10 * br, 1), "board": round(5 * bo, 1)}
         breakdown: dict[str, Any] = {

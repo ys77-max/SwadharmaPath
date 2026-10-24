@@ -43,7 +43,7 @@ def pay(entry, mid, senior):
             "note": "Indicative metro ranges; varies widely by city and employer."}
 
 # interest_weights order: R, I, A, S, E, C
-CAREERS = [
+CAREERS_V1 = [
     dict(name="Software Engineer", family=F[1], riasec_code="IRC", interest_weights=[0.6, 0.9, 0.3, 0.2, 0.3, 0.6],
          aptitude_min={"numerical": "Average", "abstract": "High"}, workstyle_fit=["D", "R"],
          values_fit=["Learning", "Achievement", "Independence", "Creativity"],
@@ -322,11 +322,11 @@ CAREERS = [
              dict(level="certification", stream_required=None, exams=[], degrees=["NSDC / Skill Council certifications (e.g. Suryamitra)"], institutions=tiers(["NISE (Suryamitra)"], ["Sector skill councils"], ["Training partners"]), duration="3-6 months", alternative_routes=None, notes=None),
          ]),
 ]
-assert len(CAREERS) == 20
-assert all(c["family"] in FAMILIES for c in CAREERS)
+assert len(CAREERS_V1) == 20
+assert all(c["family"] in FAMILIES for c in CAREERS_V1)
 
 ALL = set(FAMILIES)
-STREAMS = [
+STREAMS_V1 = [
     dict(name="Science - PCM", board="CBSE", subjects=["English", "Physics", "Chemistry", "Mathematics", "Elective: Computer Science / Physical Education / Economics"],
          keeps_open=[F[1], F[3], F[4], F[5], F[6], F[7], F[8], F[9], F[10], F[13], F[14], F[15]], closes=[F[2]],
          notes="Biology-based medicine (MBBS, nursing) needs Biology in Class 12."),
@@ -352,5 +352,15 @@ STREAMS = [
          keeps_open=[F[8], F[9], F[10], F[14], F[15]], closes=[F[1], F[2], F[3], F[4], F[6]],
          notes="Hands-on route. Design entrances (NID, NIFT, UCEED) accept any stream."),
 ]
-assert len(STREAMS) == 8
+assert len(STREAMS_V1) == 8
+assert all(set(s["keeps_open"]) | set(s["closes"]) <= ALL for s in STREAMS_V1)
+
+# Migration 003 adds the rest (library_more.py); V1 stays as seeded by 001_init.sql.
+from library_more import MORE_CAREERS, MORE_STREAMS  # noqa: E402
+
+CAREERS = CAREERS_V1 + MORE_CAREERS
+STREAMS = STREAMS_V1 + MORE_STREAMS
+assert len({c["name"] for c in CAREERS}) == len(CAREERS), "career names must be unique"
+assert len({s["name"] for s in STREAMS}) == len(STREAMS), "stream names must be unique"
+assert all(c["family"] in FAMILIES for c in CAREERS)
 assert all(set(s["keeps_open"]) | set(s["closes"]) <= ALL for s in STREAMS)

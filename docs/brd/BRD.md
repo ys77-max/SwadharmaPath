@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Document | BRD |
-| Version | 1.2 |
+| Version | 1.3 |
 | Status | Baseline for V1 (launch) |
 | Last updated | 2026-10-24 |
 | Source | SwadharmaPath PRD (Sections 1, 3, 6, 8–13, 15, 17) as translated into the build prompt |
@@ -162,7 +162,8 @@ IDs are stable; reference them in pull requests and tests.
 |---|---|---|
 | FR-C1 | Each career has family, RIASEC code, description, day in the life, entry paths, India salary band, outlook (growing / stable / transforming / declining), automation exposure, adjacent emerging roles, sources and last-reviewed date. | P1 |
 | FR-C2 | Education pathways per career by level (Class 11–12, UG, PG, diploma, certification, global) with exams, degrees, institutions by tier, duration and alternative routes. | P1 |
-| FR-C3 | Stream options are maintained per board (CBSE seeded first). | P1 |
+| FR-C3 | Stream options are maintained per board: CBSE subject combinations, CISCE (ISC), state boards (PUC / HSC / intermediate), NIOS, IB and Cambridge, plus the after-Class-10 polytechnic diploma and ITI routes open to any board. An early-explorer candidate is shown only their own board's streams and the any-board routes. | P1 |
+| FR-C9 | The career library covers all 15 families with about 150 careers from professional, government, creative, vocational and skilled-trade paths, each with at least one education pathway. Seed content is marked unreviewed until the first refresh or CSV review. | P1 |
 | FR-C4 | Admin is reminded quarterly to refresh outlook, with source and last-reviewed date recorded. | P1 |
 | FR-C5 | Admin can refresh careers, streams or both with one click (**Refresh now**). The system checks every entry against current Indian sources and drafts changes with citations; it also queues this refresh itself on 1 January, April, July and October. | P1 |
 | FR-C6 | Admin can download the careers or streams library as CSV, correct it in a spreadsheet and upload it. Empty cells leave a field unchanged; a row without an id adds a new entry; invalid rows are listed and skipped. | P1 |
@@ -307,3 +308,4 @@ All P1 items in Section 4.1 are demonstrable end to end with seed data, and:
 | 1.0 | 2026-10-24 | Baseline from the PRD-derived build specification |
 | 1.1 | 2026-10-24 | Quarterly library refresh by admin (AI-drafted or CSV, approved per change) and admin archiving with an admin-set timeframe: scope items 6 and 13, FR-C5 to FR-C8, FR-D4, FR-D5, BR-11 to BR-13 |
 | 1.2 | 2026-10-24 | Hosting assumption: the worker runs on GitHub Actions (free) instead of Railway |
+| 1.3 | 2026-10-24 | Library expanded to 148 careers and 43 stream options across boards; streams filtered to the candidate's board (FR-C3, new FR-C9). Demo cases for training and testing |

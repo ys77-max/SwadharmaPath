@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Document | LLD |
-| Version | 1.3 |
+| Version | 1.4 |
 | Last updated | 2026-10-24 |
 | Code baseline | `feat/start-here`: migration, Edge Functions, web app and worker (Start Here scope). |
 | Related | [BRD](../brd/BRD.md) · [HLD](HLD.md) |
@@ -19,7 +19,8 @@
 | `src/` | React app (Vite + TS, Tailwind v4, shadcn-style components in `src/components/ui`, Recharts). `src/lib/supabase.ts` client; `src/lib/api/` data layer | implemented (Start Here routes) |
 | `supabase/migrations/001_init.sql` | Schema, constraints, helpers, RLS, triggers, views, RPCs, storage, generated seed | implemented |
 | `supabase/migrations/002_library_refresh_archive.sql` | Library refresh tables and RPCs, archiving columns, settings, RPCs and pg_cron job; `v_caseload` and `assessment_gate` replaced to respect archiving | implemented |
-| `supabase/seed/` | `build_seed.py`, `instruments.py`, `library.py` — regenerate the seed block of the migration | implemented |
+| `supabase/migrations/003_library_expansion.sql` | Generated: 128 more careers with pathways and 35 more stream options, each inserted only if no row of that name exists | implemented |
+| `supabase/seed/` | `build_seed.py` (writes the 001 seed block and 003), `instruments.py`, `library.py` (first 20 careers / 8 streams as `CAREERS_V1` / `STREAMS_V1`; `CAREERS` / `STREAMS` are the full library), `library_more.py` (the 003 content), `build_demo.py` (demo cases SQL, not a migration) | implemented |
 | `supabase/tests/` | `run.sh` (applies every migration in order), stub, fixtures, `rls_test.sql`, `owner_test.sql`, `library_archive_test.sql`, `archive_owner_test.sql` | implemented |
 | `supabase/functions/_shared/` | `scoring.ts` (TS scorer), `scoring_fixtures.json` (shared with the worker), `workstyle_templates.json`, `cors.ts` | implemented |
 | `supabase/functions/score_instrument/` | Edge Function | implemented |
@@ -247,17 +248,20 @@ constraints   = 0 when the career's family is in candidates.constraints.exclude_
 
 The interest vector comes from `profile_summary` (falls back to the latest interest result). Top 15 by fit are upserted into `career_matches` with `rank`, `match_version`, and `breakdown {interest, aptitude, workstyle, values, outlook, constraints, explanation{…}, swadharma?}`. Re-runs keep `counsellor_action` and `visible_to_candidate`; rows that drop out of the top 15 are deleted only when the counsellor has not acted on them and they are unpublished.
 
-### 9.3 Stream recommendation (`worker/streams.py`, `streams-0.1`) — early_explorer
+### 9.3 Stream recommendation (`worker/streams.py`, `streams-0.2`) — early_explorer
 
 ```
 stream_fit = 35·cosine(interest_vector, mean RIASEC profile of the families the stream keeps open)
            + 30·mean aptitude percentile of the stream's sub-tests / 100
                (PCMB numerical+abstract+verbal; PCM numerical+abstract; PCB verbal+abstract;
-                Commerce numerical+verbal; Humanities verbal+abstract; Design/Vocational spatial+abstract)
+                NIOS Science numerical+abstract; Commerce numerical+verbal; Fine Arts spatial+verbal;
+                Humanities verbal+abstract; Design/Vocational/ITI Trade spatial+abstract; Polytechnic numerical+spatial)
            + 20·mean over key subjects of (marks % and (enjoyment − 1)/4)
            + 10·keeps_open count / widest count
-           + 5·board match
+           + 5·board match (the candidate's board or "Any board")
 ```
+
+Board filter: `normalise_board(candidates.board)` maps free text to a stream-option board by keyword (ICSE/ISC → `CISCE`; CBSE; NIOS; IB; Cambridge/IGCSE; any state name, PUC, HSC, SSC, SSLC or "state" → `State Board`). Only streams of that board plus `board = 'Any board'` (polytechnic, ITI) are ranked. With no board, or a board no stream uses, every stream is ranked. The aptitude and subject keys are the first case-insensitive substring match of the stream name, in table order (e.g. "Commerce with Applied Mathematics" before "Commerce", "Fine Arts" before "Humanities").
 
 Enjoyment comes from `subject_enjoyment` rows, filled in from the "Subjects I enjoy" instrument where the counsellor has not entered a value. Missing data scores 0.5 for that part. Top 5 plus the widest stream if it is not already there (5–6 rows). Breakdown carries `keeps_open`, `closes`, up to 3 `sample_careers` per open family, `widest`, and the counsellor-only `swadharma` roll-up (sum of family points over `keeps_open`).
 
@@ -356,9 +360,9 @@ Notifications are upserted on (`user_id`, `kind`, `entity_id`) with ignore-dupli
 | Web + TS scorer | `npx vitest run` | Runner buffer/timer helpers, TS scorer against the shared fixtures, library CSV export and header detection |
 | Types / build | `npx tsc -b && npx vite build` | Web app |
 | Edge Functions | `deno check supabase/functions/*/index.ts` | Type check |
-| Worker | `cd worker && pytest` | Scorer parity, matcher, streams, Swadharma (SAV 337, D9/D10, sub-lords, dashas, unknown time, banned words, junior windows), reports (disclaimer, no Swadharma or private notes outside case_file, 8-page junior, PDF render), scheduler, library refresh (seed validates, CSV round-trip, edits/new/errors, AI loop with a fake client incl. `pause_turn` and refusal, jobs, quarterly queueing, rematch skipping archived), and an end-to-end pipeline on an in-memory database |
+| Worker | `cd worker && pytest` | Scorer parity, matcher, streams, Swadharma (SAV 337, D9/D10, sub-lords, dashas, unknown time, banned words, junior windows), reports (disclaimer, no Swadharma or private notes outside case_file, 8-page junior, PDF render), scheduler, streams board filter and lookup keys, library refresh (seed validates, CSV round-trip, edits/new/errors, AI loop with a fake client incl. `pause_turn` and refusal, jobs, quarterly queueing, rematch skipping archived), and an end-to-end pipeline on an in-memory database |
 
-Any change to policies, triggers or RPCs needs a matching SQL test. Regenerate seed data with `python3 supabase/seed/build_seed.py` (rewrites everything after `-- BEGIN GENERATED SEED`); regenerate scorer fixtures with `python3 supabase/seed/build_scoring_fixtures.py` then `UPDATE_FIXTURES=1 npx vitest run supabase/functions`.
+Any change to policies, triggers or RPCs needs a matching SQL test. `run.sh` stops on the first failing migration. Regenerate seed data with `python3 supabase/seed/build_seed.py` (rewrites everything after `-- BEGIN GENERATED SEED` in 001 and all of 003; 001's block must stay byte-identical, so add new library content to `library_more.py`); regenerate scorer fixtures with `python3 supabase/seed/build_scoring_fixtures.py` then `UPDATE_FIXTURES=1 npx vitest run supabase/functions`.
 
 ## 12. Change history
 
@@ -368,3 +372,4 @@ Any change to policies, triggers or RPCs needs a matching SQL test. Regenerate s
 | 1.1 | 2026-10-24 | Start Here code landed: Edge Functions, web app, worker. Engine sections now describe the implemented formulas; `next_item` has no expiry grace; report storage path; worker and demo-mode configuration; test suites |
 | 1.2 | 2026-10-24 | Migration 002: library refresh tables, admin RPCs, archiving columns/settings/RPCs, auto-archive cron, `v_caseload` and `assessment_gate` changes; `library_refresh.py` (§9.6), new jobs, `ANTHROPIC_API_KEY`; admin pages; tests |
 | 1.3 | 2026-10-24 | Worker on GitHub Actions: `--run` groups, `WORKER_PUBLIC_LOGS`, `worker.yml` schedule |
+| 1.4 | 2026-10-24 | Migration 003 library expansion (148 careers, 43 streams); `streams-0.2` board filter and new lookup keys; `build_demo.py`; `run.sh` fails on migration errors |
