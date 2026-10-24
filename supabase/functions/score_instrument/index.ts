@@ -9,15 +9,6 @@ import { ageBand, SCORING_VERSION, scoreSession, type Section } from '../_shared
 const URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
-const TRIGGER_SECRET = Deno.env.get('EDGE_TRIGGER_SECRET') ?? ''
-
-// Constant-time comparison so the trigger secret cannot be guessed by timing.
-function sameSecret(a: string, b: string): boolean {
-  if (!a || !b || a.length !== b.length) return false
-  let diff = 0
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
-  return diff === 0
-}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -33,7 +24,13 @@ Deno.serve(async (req) => {
 
   const admin = createClient(URL, SERVICE_KEY, { auth: { persistSession: false } })
   const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
-  const fromTrigger = sameSecret(req.headers.get('x-trigger-secret') ?? '', TRIGGER_SECRET) || sameSecret(token, SERVICE_KEY)
+  // The trigger's shared secret lives only in Vault; the database checks it.
+  const triggerSecret = req.headers.get('x-trigger-secret')
+  let fromTrigger = token === SERVICE_KEY
+  if (!fromTrigger && triggerSecret) {
+    const { data: ok } = await admin.rpc('verify_trigger_secret', { p_secret: triggerSecret })
+    fromTrigger = ok === true
+  }
 
   const { data: session, error: sErr } = await admin
     .from('assessment_sessions')

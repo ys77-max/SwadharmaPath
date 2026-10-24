@@ -62,7 +62,7 @@ The worker runs every 15 minutes, so new matches and PDFs can take up to about 2
 
 ### T-21 Results did not appear after a candidate completed a test
 1. Check **Assessments**: status should be completed.
-2. If completed but not scored for more than 15 minutes, report it to the technical owner with the candidate name and instrument. (Technical: check `score_instrument` logs and the Vault secrets `project_url` and `edge_trigger_secret`; a missing secret logs a warning and skips the call. If `net._http_response` shows 403 `forbidden`, Vault `edge_trigger_secret` and the Edge Function secret `EDGE_TRIGGER_SECRET` differ; set them to the same value per SOP-T1 step 1. The worker still scores these within 15 minutes.)
+2. If completed but not scored for more than 15 minutes, report it to the technical owner with the candidate name and instrument. (Technical: check `score_instrument` logs and the Vault secrets `project_url` and `edge_trigger_secret`; a missing secret logs a warning and skips the call. If `net._http_response` shows 403 `forbidden`, check that Vault `edge_trigger_secret` exists (migration 004) and that the deployed `score_instrument` is the version that checks it. The worker still scores these within 15 minutes.)
 
 ### T-22 "Only counsellor_notes can be edited"
 Swadharma points come from the engine; you can only edit the notes field.

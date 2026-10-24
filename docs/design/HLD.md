@@ -215,14 +215,14 @@ sequenceDiagram
 | Abuse | Lead form throttled per contact (3/hour) and globally (30/minute). |
 | Library integrity | AI and CSV output is stored as proposals; only `apply_library_refresh` (admin) writes the library, and only whitelisted fields. The worker sends Claude library content only, never candidate data. |
 | Archiving | Admin-only RPCs; no delete anywhere; audited. Archived rows keep every existing policy, so Swadharma isolation and append-only rules are unchanged. |
-| Secrets | Service-role key only in the worker and Edge Function environment and Supabase Vault (`project_url`, optional `service_role_key`). Trigger calls to Edge Functions carry a dedicated shared secret (Vault `edge_trigger_secret` = Edge Function secret `EDGE_TRIGGER_SECRET`), not the service-role key. `ANTHROPIC_API_KEY` only on the worker. Never in `VITE_*` variables. |
+| Secrets | Service-role key only in the worker and Edge Function environment and Supabase Vault (`project_url`, optional `service_role_key`). Trigger calls to Edge Functions carry a dedicated shared secret (Vault `edge_trigger_secret`, generated in the database and checked there by `verify_trigger_secret`), not the service-role key. `ANTHROPIC_API_KEY` only on the worker. Never in `VITE_*` variables. |
 
 ## 6. Deployment view
 
 | Component | Platform | Config |
 |---|---|---|
 | Web | Vercel project `swadharmapath` (team YSS), production branch `main`; `vercel.json` rewrites client routes to `index.html` and sets basic security headers | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
-| Database, Auth, Storage, Edge Functions | Supabase project `SwadharmaPath` (ref `fskmeqrjtwdswaoqwjkh`, ap-south-1) | Migrations in `supabase/migrations`; Vault secrets `project_url`, `edge_trigger_secret`; Edge Function secret `EDGE_TRIGGER_SECRET`; extensions `pgcrypto`, `pg_net`, `pg_cron` |
+| Database, Auth, Storage, Edge Functions | Supabase project `SwadharmaPath` (ref `fskmeqrjtwdswaoqwjkh`, ap-south-1) | Migrations in `supabase/migrations`; Vault secrets `project_url`, `edge_trigger_secret`; extensions `pgcrypto`, `pg_net`, `pg_cron` |
 | Worker | GitHub Actions workflow `worker.yml`: every 15 minutes (polling jobs), 02:15 IST (nightly), 09:00 IST on 1 Jan/Apr/Jul/Oct (quarterly); free on this public repo. Logs are public, so `WORKER_PUBLIC_LOGS=true` keeps names and tracebacks out. `worker/Dockerfile` remains for an always-on host (Render, Railway) if minute-level freshness is needed | Repo secrets `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY` (optional); `SUPABASE_URL` defaults to the production project |
 | Claude API | Anthropic (`claude-opus-5-5` with web search) | Called by the worker only, about ₹15–20 per library entry, roughly ₹500 for a full refresh of the seeded library |
 

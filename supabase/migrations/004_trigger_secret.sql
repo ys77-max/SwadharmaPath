@@ -1,9 +1,18 @@
--- Trigger -> Edge Function calls authenticate with a dedicated shared secret
--- (Vault 'edge_trigger_secret', Edge Function secret EDGE_TRIGGER_SECRET) sent
--- in the x-trigger-secret header, so they no longer depend on the Vault copy of
--- the service-role key matching the function's own key. The bearer from Vault
--- 'service_role_key' is still sent when present. Never blocks the caller.
+-- Trigger -> Edge Function calls authenticate with a dedicated shared secret,
+-- so they no longer depend on the Vault copy of the service-role key matching
+-- the function's own key. The secret is generated here, lives only in Vault
+-- ('edge_trigger_secret') and is sent as the x-trigger-secret header; the
+-- function checks it with public.verify_trigger_secret (service role only).
 begin;
+
+do $$
+begin
+  if not exists (select 1 from vault.decrypted_secrets where name = 'edge_trigger_secret') then
+    perform vault.create_secret(encode(extensions.gen_random_bytes(32), 'hex'), 'edge_trigger_secret');
+  end if;
+exception when undefined_function or undefined_table or invalid_schema_name then
+  raise warning 'vault not available; edge_trigger_secret not created';
+end $$;
 
 create or replace function private.invoke_edge_function(p_name text, p_body jsonb) returns void
 language plpgsql security definer set search_path = '' as $$
@@ -30,5 +39,17 @@ begin
   end;
 end $$;
 revoke execute on function private.invoke_edge_function(text, jsonb) from public, anon, authenticated;
+
+-- True when p_secret equals Vault 'edge_trigger_secret'. Only the service role
+-- (the Edge Function's admin client) may call it.
+create or replace function public.verify_trigger_secret(p_secret text) returns boolean
+language plpgsql stable security definer set search_path = '' as $$
+declare v text;
+begin
+  select decrypted_secret into v from vault.decrypted_secrets where name = 'edge_trigger_secret';
+  return v is not null and p_secret is not null and p_secret = v;
+end $$;
+revoke execute on function public.verify_trigger_secret(text) from public, anon, authenticated;
+grant execute on function public.verify_trigger_secret(text) to service_role;
 
 commit;
