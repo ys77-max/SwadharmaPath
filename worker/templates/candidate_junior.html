@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% import "_macros.html" as m with context %}
+{% block body %}
+{{ m.cover("Your leanings", "A picture of what you enjoy and what you are good at today. Leanings change as you grow; that is a good thing.") }}
+<div class="box"><b>How to read this</b><br>There are no right or wrong answers and no "types" here. These are leanings: the things you seem to enjoy and do well right now. Talk them over with your family and your counsellor.</div>
+<h2 class="page-break">What you enjoy</h2>
+{% if interest %}<table>{% for i in interest %}<tr><td style="width:45%"><b>{{ i.label }}</b></td><td>{{ m.bar(i.pct) }}</td></tr>{% endfor %}</table>{% else %}<p class="muted">Not yet taken.</p>{% endif %}
+<p class="muted">Your top leanings point to activities you are likely to enjoy in school, hobbies and later at work.</p>
+<h2 class="page-break">Your thinking strengths</h2>
+{% if aptitude %}<table>{% for a in aptitude %}<tr><td style="width:30%"><b>{{ a.label }}</b></td><td>{{ m.bar(a.pct, 100, "saffron") }}</td><td style="width:18%">{{ a.band or "" }}</td></tr>{% endfor %}</table>{% else %}<p class="muted">Not yet taken.</p>{% endif %}
+<p class="muted">Every strength can grow with practice.</p>
+<h2 class="page-break">How you like to work</h2>
+{% if workstyle.primary %}<p>Your strongest leaning is <b>{{ workstyle.primary_label }}</b>{% if workstyle.secondary %}, then <b>{{ workstyle.secondary_label }}</b>{% endif %}.</p>
+{% if workstyle.table %}{% for area, text in workstyle.table.items() %}{% if loop.index <= 4 %}<div class="box"><b>{{ area|replace("_", " ")|capitalize }}</b><br>{{ text }}</div>{% endif %}{% endfor %}{% endif %}
+{% else %}<p class="muted">Not yet taken.</p>{% endif %}
+<h2 class="page-break">What matters to you</h2>
+{% if values_top5 %}{% for v in values_top5 %}<div class="box"><b>{{ loop.index }}. {{ v }}</b></div>{% endfor %}{% else %}<p class="muted">Not yet taken.</p>{% endif %}
+<h2 class="page-break">Streams that fit your leanings</h2>
+<p class="muted">We always include the stream that keeps the most doors open. None of these is the only right choice.</p>
+{{ m.stream_list(streams) }}
+<h2 class="page-break">What your counsellor noticed</h2>
+{% if narrative.summary %}<p>{{ narrative.summary }}</p>{% endif %}
+{% if narrative.strengths %}<div class="box"><b>Strengths</b><ul>{% for s in narrative.strengths %}<li>{{ s }}</li>{% endfor %}</ul></div>{% endif %}
+{% if narrative.watch_outs %}<div class="box"><b>Things to grow</b><ul>{% for s in narrative.watch_outs %}<li>{{ s }}</li>{% endfor %}</ul></div>{% endif %}
+<h2 class="page-break">Your next steps</h2>
+{{ m.roadmap_block() }}
+<div class="box"><b>Try this month</b><ul><li>Talk to one adult whose work sounds interesting.</li><li>Pick one subject you enjoy and go one step deeper.</li><li>Share this report with your family over dinner.</li></ul></div>
+<h2>About this report</h2><p>{{ disclaimer }}</p>
+{% endblock %}

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{% block title %}{{ agency.name }} report{% endblock %}</title>
+<style>
+  @page {
+    size: A4; margin: 18mm 16mm 26mm 16mm;
+    @top-left { content: "{{ agency.name }}"; font: 700 9pt sans-serif; color: #0f5257; }
+    @top-right { content: "{{ candidate.full_name }} · v{{ version }} · page " counter(page) " of " counter(pages); font: 9pt sans-serif; color: #6b6b6b; }
+    @bottom-center { content: element(disclaimer); width: 100%; }
+  }
+  html { font-family: "Inter", "Noto Sans", "DejaVu Sans", sans-serif; font-size: {% if junior %}12pt{% else %}10.5pt{% endif %}; color: #1f2a2b; line-height: 1.45; }
+  h1 { color: #082c2f; font-size: 22pt; margin: 0 0 4pt; }
+  h2 { color: #0f5257; font-size: 14pt; border-bottom: 2px solid #e8d3ad; padding-bottom: 3pt; margin-top: 18pt; }
+  h3 { color: #0c3f43; font-size: 11.5pt; margin: 12pt 0 4pt; }
+  .muted { color: #6b6b6b; }
+  .cover { background: #f8f0e2; border-radius: 10pt; padding: 16pt 18pt; margin-bottom: 14pt; }
+  .tag { display: inline-block; background: #d5ebe9; color: #0c3f43; border-radius: 8pt; padding: 1pt 7pt; font-size: 8.5pt; margin-right: 3pt; }
+  .tag.sand { background: #f3e6cf; color: #6b4a1a; }
+  table { width: 100%; border-collapse: collapse; margin: 6pt 0; }
+  th { text-align: left; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .03em; color: #0f5257; border-bottom: 1px solid #a9d4d1; padding: 4pt; }
+  td { border-bottom: 1px solid #f3e6cf; padding: 4pt; vertical-align: top; }
+  .bar { background: #f3e6cf; border-radius: 4pt; height: 8pt; width: 100%; }
+  .bar > span { display: block; height: 8pt; border-radius: 4pt; background: #23736f; }
+  .bar.saffron > span { background: #e0a458; }
+  .grid2 { display: flex; gap: 12pt; }
+  .grid2 > div { flex: 1; }
+  .box { border: 1px solid #e8d3ad; border-radius: 8pt; padding: 8pt 10pt; margin: 6pt 0; }
+  .page-break { break-before: page; }
+  .disclaimer-running { position: running(disclaimer); font-size: 6.8pt; color: #6b6b6b; text-align: center; line-height: 1.3; }
+  .disclaimer-full { border: 2px solid #e0a458; background: #fdfaf4; border-radius: 8pt; padding: 10pt 12pt; font-size: 10.5pt; }
+  ul { margin: 4pt 0 4pt 14pt; padding: 0; }
+</style>
+</head>
+<body>
+<div class="disclaimer-running">{{ disclaimer }}</div>
+{% block body %}{% endblock %}
+</body>
+</html>

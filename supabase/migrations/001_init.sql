@@ -1170,7 +1170,6 @@ language plpgsql security definer set search_path = '' as $$
 declare
   s public.assessment_sessions;
   v_total int; v_pos int; r record; v_started timestamptz; v_meta jsonb; v_furthest int;
-  v_grace interval := interval '5 seconds';
 begin
   s := private.session_for_caller(p_session_id);
   if s.status <> 'in_progress' then raise exception 'assessment is not in progress' using errcode = '22023'; end if;
@@ -1191,7 +1190,7 @@ begin
     select * into r from private.instrument_items(s.instrument_id) x where x.pos = v_pos;
     exit when r.section_time_sec is null;
     v_started := (v_meta->'section_started'->>r.section_code)::timestamptz;
-    if v_started is not null and now() > v_started + make_interval(secs => r.section_time_sec) + v_grace then
+    if v_started is not null and now() >= v_started + make_interval(secs => r.section_time_sec) then
       -- time is up for this section: skip to the first item of the next section
       select min(pos) into v_pos from private.instrument_items(s.instrument_id) x
       where x.pos > v_pos and x.section_code <> r.section_code;

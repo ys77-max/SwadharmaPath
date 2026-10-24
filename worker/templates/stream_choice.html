@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% import "_macros.html" as m with context %}
+{% block body %}
+{{ m.cover("Choosing a stream for Class 11", "Stream options matched to interests, aptitude, marks and subject enjoyment.") }}
+<div class="box">Each option lists the career families it keeps open and those that become harder to reach later. The widest option is always included. This is not a single-career recommendation.</div>
+<h2>Recommended streams</h2>
+{{ m.stream_list(streams) }}
+<h2>What the choice is based on</h2>
+<div class="grid2">
+  <div class="box"><b>Enjoys</b><br>{% for i in interest[:3] %}{{ i.label }}{% if not loop.last %}, {% endif %}{% else %}<span class="muted">pending</span>{% endfor %}</div>
+  <div class="box"><b>Strengths</b><br>{% for a in aptitude %}{{ a.label }}: {{ a.band }}{% if not loop.last %}<br>{% endif %}{% else %}<span class="muted">pending</span>{% endfor %}</div>
+</div>
+<h2>Next steps</h2>
+{{ m.roadmap_block() }}
+<p class="muted">{{ disclaimer }}</p>
+{% endblock %}

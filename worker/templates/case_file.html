@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% import "_macros.html" as m with context %}
+{% block body %}
+{{ m.cover("Case file", "Counsellor only. Includes private session notes and the Swadharma analysis.") }}
+<table>
+  <tr><td><b>Track</b></td><td>{{ candidate.track }}</td><td><b>Board</b></td><td>{{ candidate.board or "—" }}</td></tr>
+  <tr><td><b>School / employer</b></td><td>{{ candidate.school_or_employer or "—" }}</td><td><b>Status</b></td><td>{{ candidate.status }}</td></tr>
+  <tr><td><b>Disclaimer accepted</b></td><td>{{ candidate.disclaimer_accepted_at|d or "—" }}</td><td><b>Guardian consent</b></td><td>{{ candidate.guardian_consent_at|d or "—" }}</td></tr>
+</table>
+{{ m.profile() }}
+<h2 class="page-break">{% if junior %}Stream matches{% else %}Career matches{% endif %} (all, incl. unpublished)</h2>
+{% if junior %}{{ m.stream_list(streams) }}{% else %}
+<table><tr><th>#</th><th>Career</th><th>Fit</th><th>Breakdown</th><th>Swadharma</th><th>Action</th></tr>
+{% for r in careers %}<tr><td>{{ r.rank }}</td><td>{{ r.careers.name if r.careers else "" }}</td><td>{{ r.fit_score|pct }}</td>
+<td class="muted" style="font-size:8pt">I {{ r.breakdown.interest }} · A {{ r.breakdown.aptitude }} · W {{ r.breakdown.workstyle }} · V {{ r.breakdown.values }} · O {{ r.breakdown.outlook }} · C {{ r.breakdown.constraints }}</td>
+<td>{{ r.breakdown.swadharma|pct }}</td><td>{{ r.counsellor_action or "" }}{% if r.visible_to_candidate %} visible{% endif %}</td></tr>{% endfor %}</table>{% endif %}
+<h2>Sessions</h2>
+{% for s in sessions %}<div class="box"><b>{{ s.scheduled_at|d }} · {{ (s.iccc_stage or "")|replace("_", " ") }}</b>{% if s.attended == False %} <span class="tag sand">missed</span>{% endif %}
+{% if s.notes_private %}<br><i>Private:</i> {{ s.notes_private }}{% endif %}{% if s.summary_for_candidate %}<br><i>Shared:</i> {{ s.summary_for_candidate }}{% endif %}</div>{% else %}<p class="muted">No sessions yet.</p>{% endfor %}
+<h2>Roadmap</h2>
+{{ m.roadmap_block() }}
+<h2 class="page-break">Swadharma (counsellor only)</h2>
+<div class="disclaimer-full">{{ disclaimer }}</div>
+{% if swadharma and swadharma.families %}{{ m.swadharma_block(swadharma, True) }}{% else %}<p class="muted">No Swadharma analysis (not opted in, or not yet computed).</p>{% endif %}
+{% endblock %}

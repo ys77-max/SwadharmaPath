@@ -1,0 +1,126 @@
+{% macro bar(value, max=100, cls="") -%}
+<div class="bar {{ cls }}"><span style="width: {{ [[(value or 0) / max * 100, 0]|max, 100]|min }}%"></span></div>
+{%- endmacro %}
+
+{% macro cover(title, subtitle) -%}
+<div class="cover">
+  <h1>{{ title }}</h1>
+  <div>{{ subtitle }}</div>
+  <div class="muted" style="margin-top:6pt">{{ candidate.full_name }}{% if candidate.class_or_years_exp %} · {{ candidate.class_or_years_exp }}{% endif %}{% if candidate.city %} · {{ candidate.city }}{% endif %}
+    · Prepared {{ generated_on|d }}{% if counsellor.full_name %} with {{ counsellor.full_name }}{% endif %}</div>
+</div>
+{%- endmacro %}
+
+{% macro profile(junior_words=False) -%}
+<h2>{% if junior_words %}What you enjoy{% else %}Interests{% endif %}</h2>
+{% if interest %}
+<table>
+  {% for i in interest %}<tr><td style="width:40%">{{ i.label }}</td><td>{{ bar(i.pct) }}</td><td style="width:12%" class="muted">{{ i.pct|pct }}</td></tr>{% endfor %}
+</table>
+{% if not junior_words and interest_code %}<p class="muted">Holland code: <b>{{ interest_code }}</b></p>{% endif %}
+{% else %}<p class="muted">Not yet taken.</p>{% endif %}
+
+<h2>{% if junior_words %}Your thinking strengths{% else %}Aptitude{% endif %}</h2>
+{% if aptitude %}
+<table>
+  <tr><th>Area</th><th></th><th>Percentile</th><th>Band</th></tr>
+  {% for a in aptitude %}<tr><td>{{ a.label }}</td><td style="width:45%">{{ bar(a.pct, 100, "saffron") }}</td><td>{{ a.pct|pct }}</td><td>{{ a.band or "—" }}</td></tr>{% endfor %}
+</table>
+{% else %}<p class="muted">Not yet taken.</p>{% endif %}
+
+<h2>{% if junior_words %}How you like to work{% else %}Work style{% endif %}</h2>
+{% if workstyle.primary %}
+<p>{% if junior_words %}Your strongest leaning is{% else %}Primary style:{% endif %} <b>{{ workstyle.primary_label }}</b>{% if workstyle.secondary %}, then <b>{{ workstyle.secondary_label }}</b>{% endif %}.</p>
+{% if workstyle.table %}
+<div class="grid2">
+  {% for area, text in workstyle.table.items() %}{% if loop.index <= 4 %}<div class="box"><b>{{ area|replace("_", " ")|capitalize }}</b><br>{{ text }}</div>{% endif %}{% endfor %}
+</div>
+{% endif %}
+{% else %}<p class="muted">Not yet taken.</p>{% endif %}
+
+<h2>{% if junior_words %}What matters to you{% else %}Values{% endif %}</h2>
+{% if values_top5 %}<p>{% for v in values_top5 %}<span class="tag sand">{{ loop.index }}. {{ v }}</span>{% endfor %}</p>{% else %}<p class="muted">Not yet taken.</p>{% endif %}
+
+{% if narrative.summary or narrative.strengths %}
+<h2>{% if junior_words %}What your counsellor noticed{% else %}Counsellor's summary{% endif %}</h2>
+{% if narrative.summary %}<p>{{ narrative.summary }}</p>{% endif %}
+<div class="grid2">
+  {% if narrative.strengths %}<div class="box"><b>Strengths</b><ul>{% for s in narrative.strengths %}<li>{{ s }}</li>{% endfor %}</ul></div>{% endif %}
+  {% if narrative.watch_outs %}<div class="box"><b>{% if junior_words %}Things to grow{% else %}Watch-outs{% endif %}</b><ul>{% for s in narrative.watch_outs %}<li>{{ s }}</li>{% endfor %}</ul></div>{% endif %}
+</div>
+{% endif %}
+{%- endmacro %}
+
+{% macro career_list(rows, show_breakdown=True) -%}
+{% if rows %}
+<table>
+  <tr><th>#</th><th>Career</th><th>Fit</th><th>{% if show_breakdown %}Why{% endif %}</th></tr>
+  {% for m in rows %}
+  <tr>
+    <td>{{ loop.index }}</td>
+    <td><b>{{ m.careers.name if m.careers else "" }}</b><br><span class="muted">{{ m.careers.family if m.careers else "" }} · outlook {{ m.careers.outlook if m.careers else "" }}</span>{% if m.counsellor_action == "pinned" %} <span class="tag">recommended</span>{% endif %}</td>
+    <td style="width:12%"><b>{{ m.fit_score|pct }}</b></td>
+    <td style="width:46%">{% if show_breakdown and m.breakdown.explanation %}{{ m.breakdown.explanation.interest }} {{ m.breakdown.explanation.aptitude }}{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}<p class="muted">Your counsellor has not shared options yet.</p>{% endif %}
+{%- endmacro %}
+
+{% macro stream_list(rows) -%}
+{% if rows %}
+{% for m in rows %}
+<div class="box">
+  <b>{{ loop.index }}. {{ m.stream_options.name if m.stream_options else "" }}</b>{% if m.counsellor_action == "pinned" %} <span class="tag">recommended</span>{% endif %}
+  <span class="muted"> · fit {{ m.fit_score|pct }}</span>
+  {% if m.breakdown.widest %}<span class="tag sand">keeps the most doors open</span>{% endif %}
+  <div class="muted">Subjects: {{ (m.stream_options.subjects if m.stream_options else [])|join(", ") }}</div>
+  <div>Keeps open: {{ (m.breakdown.keeps_open or [])|join(" · ") }}</div>
+  {% if m.breakdown.closes %}<div class="muted">Harder later: {{ m.breakdown.closes|join(" · ") }}</div>{% endif %}
+  {% if m.breakdown.sample_careers %}<div class="muted">Examples:
+    {% for fam, names in m.breakdown.sample_careers.items() %}{% if names %}{{ names|join(", ") }}{% if not loop.last %}; {% endif %}{% endif %}{% endfor %}</div>{% endif %}
+</div>
+{% endfor %}
+{% else %}<p class="muted">Stream options will appear once your counsellor shares them.</p>{% endif %}
+{%- endmacro %}
+
+{% macro roadmap_block() -%}
+{% if roadmap %}
+<p class="muted">{{ roadmap.start_date|d }} to {{ roadmap.end_date|d }} · {{ roadmap.status }}</p>
+<table>
+  <tr><th>When</th><th>What</th><th>Who</th><th>Status</th></tr>
+  {% for i in roadmap_items %}<tr><td style="width:18%">{{ i.due_date|d }}</td><td><b>{{ i.title }}</b>{% if i.description %}<br><span class="muted">{{ i.description }}</span>{% endif %}</td><td>{{ i.owner }}</td><td>{{ i.status|replace("_", " ") }}</td></tr>{% endfor %}
+</table>
+{% else %}<p class="muted">The roadmap will be added after the planning session.</p>{% endif %}
+{%- endmacro %}
+
+{% macro swadharma_block(sw, staff=False) -%}
+<p class="muted">Confidence: <b>{{ sw.confidence or "—" }}</b>{% if sw.lagna %} · Lagna {{ sw.lagna }}{% endif %}{% if sw.time_known == False %} · birth time unknown, Moon-sign and dignity only{% endif %}</p>
+<h3>Career-family points (out of 100)</h3>
+<table>
+  <tr><th>Family</th><th>Points</th><th></th>{% if staff %}<th>Components</th>{% endif %}</tr>
+  {% for f in sw.families %}
+  <tr><td>{{ f.family }}</td><td style="width:9%"><b>{{ f.points|pct }}</b></td><td style="width:26%">{{ bar(f.points, 100, "saffron") }}</td>
+    {% if staff %}<td class="muted" style="font-size:8pt">{% for k, v in f.components.items() %}{{ sw.component_labels.get(k, k) }} {{ v }}{% if not loop.last %} · {% endif %}{% endfor %}{% if f.notes %}<br><i>Note: {{ f.notes }}</i>{% endif %}</td>{% endif %}</tr>
+  {% endfor %}
+</table>
+{% if sw.lens %}
+<h3>Personality lens</h3>
+{% for i in sw.lens["items"] %}<div class="box"><b>{{ i.basis }}: {{ i.value }}</b><br>{{ i.tendencies }} {{ i.strengths }}<br><span class="muted">{{ i.watch_outs }}</span></div>{% endfor %}
+<p class="muted">{{ sw.lens.note }}</p>
+{% endif %}
+{% if sw.agreement %}
+<h3>Agreement with the psychometric profile</h3>
+<table>
+  <tr><th>Family</th><th>Swadharma rank</th><th>Psychometric rank</th><th>Reading</th></tr>
+  {% for a in sw.agreement %}{% if a.verdict != "—" %}<tr><td>{{ a.family }}</td><td>{{ a.swadharma_rank }}</td><td>{{ a.psychometric_rank }}</td><td><b>{{ a.verdict }}</b></td></tr>{% endif %}{% endfor %}
+</table>
+{% endif %}
+{% if sw.windows %}
+<h3>Favourable windows</h3>
+<table>
+  <tr><th>From</th><th>To</th><th>For</th></tr>
+  {% for w in sw.windows %}<tr><td>{{ w.from|d }}</td><td>{{ w.to|d }}</td><td>{{ w.purpose }}{% if staff %} <span class="muted">({{ w.dasha }})</span>{% endif %}</td></tr>{% endfor %}
+</table>
+{% endif %}
+{%- endmacro %}

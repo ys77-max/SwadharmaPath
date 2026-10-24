@@ -1,0 +1,51 @@
+{
+  "_note": "Planet → career-family significations (karakatwa), weights 0-1. Editable by the agency's astrologer; the engine reads this file at run time. Families must match worker/families.py.",
+  "version": "karakatwa-0.1",
+  "planets": {
+    "Sun": {
+      "_signifies": "governance, medicine, leadership",
+      "Law & Governance": 1.0, "Public Service & Defence": 0.8, "Medicine & Health": 0.8,
+      "Business, Management & Entrepreneurship": 0.6
+    },
+    "Moon": {
+      "_signifies": "public, hospitality, counselling",
+      "Hospitality, Travel & Service": 1.0, "Education & Counselling": 0.8, "Sales, Marketing & Media": 0.5,
+      "Social Work & Spirituality": 0.5, "Medicine & Health": 0.4, "Agriculture, Environment & Earth": 0.4
+    },
+    "Mars": {
+      "_signifies": "engineering, defence, surgery, sports",
+      "Engineering & Technology": 1.0, "Public Service & Defence": 1.0, "Medicine & Health": 0.6,
+      "Skilled Trades & Crafts": 0.5, "Agriculture, Environment & Earth": 0.3
+    },
+    "Mercury": {
+      "_signifies": "commerce, writing, analytics, IT",
+      "Mathematics, Finance & Analytics": 1.0, "Writing, Communication & Languages": 1.0, "Sales, Marketing & Media": 0.7,
+      "Engineering & Technology": 0.6, "Business, Management & Entrepreneurship": 0.6
+    },
+    "Jupiter": {
+      "_signifies": "teaching, law, finance, spirituality",
+      "Education & Counselling": 1.0, "Social Work & Spirituality": 1.0, "Law & Governance": 0.9,
+      "Mathematics, Finance & Analytics": 0.7, "Pure Sciences & Research": 0.4
+    },
+    "Venus": {
+      "_signifies": "arts, design, media, luxury",
+      "Arts, Design & Performance": 1.0, "Sales, Marketing & Media": 0.8, "Hospitality, Travel & Service": 0.6,
+      "Writing, Communication & Languages": 0.3
+    },
+    "Saturn": {
+      "_signifies": "service, infrastructure, research discipline, trades",
+      "Skilled Trades & Crafts": 1.0, "Pure Sciences & Research": 0.7, "Agriculture, Environment & Earth": 0.7,
+      "Engineering & Technology": 0.6, "Public Service & Defence": 0.5, "Social Work & Spirituality": 0.4
+    },
+    "Rahu": {
+      "_signifies": "technology, foreign, unconventional",
+      "Engineering & Technology": 0.8, "Sales, Marketing & Media": 0.5, "Hospitality, Travel & Service": 0.5,
+      "Business, Management & Entrepreneurship": 0.5, "Pure Sciences & Research": 0.4
+    },
+    "Ketu": {
+      "_signifies": "research, spirituality, healing",
+      "Pure Sciences & Research": 1.0, "Social Work & Spirituality": 0.9, "Medicine & Health": 0.7,
+      "Mathematics, Finance & Analytics": 0.3
+    }
+  }
+}

@@ -1,0 +1,10 @@
+# SwadharmaPath worker (Python 3.12)
+supabase==2.33.0
+pyswisseph==2.10.3.2
+weasyprint==70.0
+Jinja2==3.1.6
+APScheduler==3.11.3
+tzdata==2026.5
+# In the agreed stack for norms work and admin analytics; not imported yet.
+numpy==2.5.4
+pandas==3.1.0

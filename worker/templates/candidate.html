@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% import "_macros.html" as m with context %}
+{% block body %}
+{{ m.cover("Your career profile", "What your assessments and sessions show, and the options worth exploring.") }}
+{{ m.profile() }}
+<h2 class="page-break">Career options to explore</h2>
+<p class="muted">Ranked by fit with your interests, aptitude, work style and values, with the outlook to 2035. Fit describes overlap, not ability.</p>
+{{ m.career_list(careers) }}
+<h2>Your roadmap</h2>
+{{ m.roadmap_block() }}
+{% if sessions %}<h2>Session notes shared with you</h2>
+{% for s in sessions %}{% if s.summary_for_candidate %}<div class="box"><b>{{ s.scheduled_at|d }}</b><br>{{ s.summary_for_candidate }}</div>{% endif %}{% endfor %}{% endif %}
+<h2>About this report</h2><p>{{ disclaimer }}</p>
+{% endblock %}
