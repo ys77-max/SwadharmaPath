@@ -57,6 +57,9 @@ You see only candidates where you are the assigned counsellor. Ask an admin to c
 ### T-29 "This case is archived; ask your counsellor to restore it"
 The candidate was archived for inactivity, so new assessments are blocked and the case is hidden from your caseload. Ask an admin to restore it from **Archive** (`/admin/archive`); it reappears straight away.
 
+### T-21a Matches or a requested report take a while to appear
+The worker runs every 15 minutes, so new matches and PDFs can take up to about 20 minutes. Scoring itself is instant.
+
 ### T-21 Results did not appear after a candidate completed a test
 1. Check **Assessments**: status should be completed.
 2. If completed but not scored for more than 15 minutes, report it to the technical owner with the candidate name and instrument. (Technical: check `score_instrument` logs and the Vault secrets `project_url` and `service_role_key`; a missing secret logs a warning and skips the call.)
@@ -97,10 +100,10 @@ Only active instruments matching the track variant are shown (early explorer →
 Only one refresh can be open. Open it from the banner on the Library page and apply or cancel it. If it has said "Checking sources…" for over an hour, the worker probably restarted: click **Cancel refresh** and start again ([SOP-T4](../sops/technical-sops.md#sop-t4-worker-operations)).
 
 ### T-34 Refresh failed: "ANTHROPIC_API_KEY is not set on the worker"
-AI refresh is not set up. The technical owner adds the key on Railway ([SOP-T1](../sops/technical-sops.md#first-go-live-checklist)). Meanwhile use **Download CSV → Upload edited CSV**.
+AI refresh is not set up. The technical owner adds the key as a GitHub repo secret ([SOP-T1](../sops/technical-sops.md#first-go-live-checklist)). Meanwhile use **Download CSV → Upload edited CSV**.
 
 ### T-35 Refresh stays on "Queued" or "Checking sources…"
-The worker picks up a run within a minute and a full AI refresh takes 15 to 30 minutes. If it stays queued, the worker is not running (check Railway). If a run is stuck, cancel it and start again.
+The worker picks up a run at its next 15-minute run and a full AI refresh takes 15 to 30 minutes. If it stays queued for over half an hour, the worker is not running (check **Actions → Worker** on GitHub; scheduled runs stop after 60 days without commits until re-enabled). If a run is stuck, cancel it and start again.
 
 ### T-36 CSV upload: "Could not tell whether this is the careers or the streams file" or "The first row must be the column headings"
 Start from **Careers CSV** or **Streams CSV** and keep the heading row as downloaded. Save as CSV (UTF-8), not .xlsx. Files over 2 MB are refused; upload careers and streams separately.

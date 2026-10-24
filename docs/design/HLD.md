@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Document | HLD |
-| Version | 1.3 |
+| Version | 1.4 |
 | Last updated | 2026-10-24 |
 | Code baseline | `feat/start-here`: database, Edge Functions, web app (Start Here routes) and worker. |
 | Related | [BRD](../brd/BRD.md) · [LLD](LLD.md) |
@@ -18,7 +18,7 @@ SwadharmaPath has three runtime parts around one Supabase project:
 
 1. **Web app** — React + TypeScript (Vite), shadcn/ui, Tailwind, Recharts. Reads and writes through Supabase with the user's JWT. It **only displays** scores; it never computes them.
 2. **Supabase** — PostgreSQL with row-level security (RLS) as the security boundary, Supabase Auth, private Storage buckets, Edge Functions, `pg_net` and `pg_cron`.
-3. **Worker** — a Python 3.12 package in `/worker` (pandas, numpy, pyswisseph, WeasyPrint, supabase-py, APScheduler) running on Railway with the service-role key. It does all scoring, matching, Swadharma computation, PDF reports and scheduled jobs.
+3. **Worker** — a Python 3.12 package in `/worker` (pandas, numpy, pyswisseph, WeasyPrint, supabase-py, APScheduler) running on a GitHub Actions timer (`.github/workflows/worker.yml`) with the service-role key. It does all scoring, matching, Swadharma computation, PDF reports and scheduled jobs.
 
 ```mermaid
 flowchart TB
@@ -34,7 +34,7 @@ flowchart TB
     EF2[Edge Fn: generate_signed_report_url]
     CRON[pg_cron nightly]
   end
-  subgraph W["Worker (Railway, Python 3.12)"]
+  subgraph W["Worker (GitHub Actions, Python 3.12)"]
     SC[scoring.py]
     MA[match.py]
     STR[streams.py]
@@ -222,7 +222,7 @@ sequenceDiagram
 |---|---|---|
 | Web | Vercel project `swadharmapath` (team YSS), production branch `main`; `vercel.json` rewrites client routes to `index.html` and sets basic security headers | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
 | Database, Auth, Storage, Edge Functions | Supabase project `SwadharmaPath` (ref `fskmeqrjtwdswaoqwjkh`, ap-south-1) | Migrations in `supabase/migrations`; Vault secrets `project_url`, `service_role_key`; extensions `pgcrypto`, `pg_net`, `pg_cron` |
-| Worker | Railway (`worker/Dockerfile`, `worker/railway.json`; one instance) | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY` (for AI library refresh; optional) |
+| Worker | GitHub Actions workflow `worker.yml`: every 15 minutes (polling jobs), 02:15 IST (nightly), 09:00 IST on 1 Jan/Apr/Jul/Oct (quarterly); free on this public repo. Logs are public, so `WORKER_PUBLIC_LOGS=true` keeps names and tracebacks out. `worker/Dockerfile` remains for an always-on host (Render, Railway) if minute-level freshness is needed | Repo secrets `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY` (optional); `SUPABASE_URL` defaults to the production project |
 | Claude API | Anthropic (`claude-opus-5-5` with web search) | Called by the worker only, about ₹15–20 per library entry, roughly ₹500 for a full refresh of the seeded library |
 
 Environments: local (Supabase CLI or plain Postgres for SQL tests) → staging Supabase project → production. See [Release and deployment SOP](../sops/technical-sops.md#sop-t1-release-and-deployment).
@@ -282,3 +282,4 @@ erDiagram
 | 1.1 | 2026-10-24 | Edge Functions, web app (Start Here routes, demo mode) and worker implemented; worker variables, schedule and deployment confirmed |
 | 1.2 | 2026-10-24 | Production go-live: Supabase project created and seeded, Edge Functions deployed, Vercel project linked to the repo with `vercel.json` for SPA routing and headers |
 | 1.3 | 2026-10-24 | Library refresh (AI via Claude API or CSV, admin approval, rematch) and archiving (admin timeframe, nightly auto-archive, restore): components, flows 4.4–4.5, jobs, security, deployment (`ANTHROPIC_API_KEY`) |
+| 1.4 | 2026-10-24 | Worker hosted on GitHub Actions (timer, public-log mode) instead of Railway; matches and reports refresh every 15 minutes rather than every minute (scoring stays instant through the Edge Function) |
