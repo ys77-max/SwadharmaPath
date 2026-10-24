@@ -2,7 +2,7 @@
 
 Procedures for developers and the technical owner.
 
-> Last updated 2026-10-24. Worker moved to GitHub Actions (free timer) instead of Railway (SOP-T1, T4, T5, T7).
+> Last updated 2026-10-24. Worker moved to GitHub Actions (free timer) instead of Railway (SOP-T1, T4, T5, T7). First admin is created in Supabase Auth, not by signing up (SOP-T1 step 4).
 
 | ID | SOP |
 |---|---|
@@ -46,7 +46,7 @@ Procedures for developers and the technical owner.
 2. Auth → URL configuration: Site URL = the Vercel production URL; add `<production URL>/**` to Redirect URLs.
 3. Worker: GitHub → repo **Settings → Secrets and variables → Actions → New repository secret**: add `SUPABASE_SERVICE_ROLE_KEY` (the Legacy service_role key). Then **Actions → Worker → Run workflow** once and check it goes green. Until the secret exists, runs skip with a notice. (Alternative for minute-level freshness: any Docker host such as Render, root directory `worker`, same variables plus `WORKER_PUBLIC_LOGS` unset; then disable the Worker workflow so jobs don't run twice.)
    Add a second secret `ANTHROPIC_API_KEY` (from the Anthropic Console, a key used only for this worker) to turn on **Refresh now with AI** and the quarterly AI refresh. Without it, CSV refresh and archiving still work and the quarterly job only sends a reminder. A full refresh of the seeded library costs roughly ₹500; set a monthly spend limit in the Console.
-4. First admin: sign up in the web app, then in the SQL editor run `update public.users set role = 'admin' where email = '<email>';`. Create counsellor accounts from /admin.
+4. First admin: the web app has no sign-up screen, so create the account in Supabase: **Authentication → Users → Add user → Create new user**, enter the email and a password, tick **Auto Confirm User**. Then in the SQL editor run `update public.users set role = 'admin' where email = '<email>';`. Create counsellor accounts from /admin.
 5. Smoke test as in step 5 above.
 
 ## SOP-T2 Database migration
