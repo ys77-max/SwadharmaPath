@@ -130,7 +130,7 @@ Disclaimer and guardian consent are pre-recorded for every demo candidate, becau
 **Load**
 
 1. Pick one password for all demo accounts (at least 8 characters). Do not reuse a real password; it will be shared with testers.
-2. `python3 supabase/seed/build_demo.py --password '<password>' > /tmp/demo.sql`
+2. `python3 supabase/seed/build_demo.py --password '<password>' > /tmp/demo.sql`, or take `supabase/seed/demo_cases.sql` and replace `__DEMO_PASSWORD__` with the password
 3. Run the file in the Supabase SQL editor. It is safe to run twice.
 4. Scores appear within seconds (the Edge Function); profiles, career matches and stream suggestions appear after the next Worker run (every 15 minutes, or run **Actions → Worker** by hand).
 

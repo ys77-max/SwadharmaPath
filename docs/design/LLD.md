@@ -20,7 +20,7 @@
 | `supabase/migrations/001_init.sql` | Schema, constraints, helpers, RLS, triggers, views, RPCs, storage, generated seed | implemented |
 | `supabase/migrations/002_library_refresh_archive.sql` | Library refresh tables and RPCs, archiving columns, settings, RPCs and pg_cron job; `v_caseload` and `assessment_gate` replaced to respect archiving | implemented |
 | `supabase/migrations/003_library_expansion.sql` | Generated: 128 more careers with pathways and 35 more stream options, each inserted only if no row of that name exists | implemented |
-| `supabase/seed/` | `build_seed.py` (writes the 001 seed block and 003), `instruments.py`, `library.py` (first 20 careers / 8 streams as `CAREERS_V1` / `STREAMS_V1`; `CAREERS` / `STREAMS` are the full library), `library_more.py` (the 003 content), `build_demo.py` (demo cases SQL, not a migration) | implemented |
+| `supabase/seed/` | `build_seed.py` (writes the 001 seed block and 003), `instruments.py`, `library.py` (first 20 careers / 8 streams as `CAREERS_V1` / `STREAMS_V1`; `CAREERS` / `STREAMS` are the full library), `library_more.py` (the 003 content), `build_demo.py` (demo cases SQL, not a migration) and its committed output `demo_cases.sql` with a `__DEMO_PASSWORD__` placeholder | implemented |
 | `supabase/tests/` | `run.sh` (applies every migration in order), stub, fixtures, `rls_test.sql`, `owner_test.sql`, `library_archive_test.sql`, `archive_owner_test.sql` | implemented |
 | `supabase/functions/_shared/` | `scoring.ts` (TS scorer), `scoring_fixtures.json` (shared with the worker), `workstyle_templates.json`, `cors.ts` | implemented |
 | `supabase/functions/score_instrument/` | Edge Function | implemented |

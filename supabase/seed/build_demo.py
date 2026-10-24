@@ -3,6 +3,10 @@ at each stage, completed assessments and a first counselling session.
 
     python3 supabase/seed/build_demo.py --password '<demo password>' > demo.sql   # load
     python3 supabase/seed/build_demo.py --remove > remove_demo.sql               # remove
+    python3 supabase/seed/build_demo.py --template > supabase/seed/demo_cases.sql  # committed copy
+
+demo_cases.sql is the same SQL with the placeholder __DEMO_PASSWORD__ instead of a password,
+for loading without Python: replace the placeholder, then run it.
 
 Run the output in the Supabase SQL editor (it runs as postgres). Every demo account uses an
 @example.com address and the name starts with "Demo" or "Test", so the cases are easy to spot
@@ -29,6 +33,7 @@ from instruments import all_instruments  # noqa: E402
 
 NS = uuid.UUID("5b0c2a8e-1d7f-4a8e-9b51-2f6f6c0d5e11")
 DOMAIN = "example.com"
+PLACEHOLDER = "__DEMO_PASSWORD__"
 JUNIOR = ["interest", "aptitude", "workstyle", "school_values", "learning", "subject_enjoyment"]
 STANDARD = ["interest", "aptitude", "workstyle", "values", "learning", "bigfive"]
 
@@ -245,9 +250,13 @@ def main(argv: list[str]) -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--password", help="password for every demo account (at least 8 characters)")
     ap.add_argument("--remove", action="store_true", help="print the removal SQL instead")
+    ap.add_argument("--template", action="store_true", help="print the load SQL with the __DEMO_PASSWORD__ placeholder")
     args = ap.parse_args(argv)
     if args.remove:
         print(build_remove())
+        return
+    if args.template:
+        print(build(PLACEHOLDER))
         return
     if not args.password or len(args.password) < 8:
         ap.error("--password with at least 8 characters is required")
