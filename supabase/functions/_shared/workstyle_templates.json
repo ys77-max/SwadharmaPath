@@ -1,0 +1,46 @@
+{
+  "version": "ws-templates-0.1",
+  "areas": ["leadership", "goal_setting", "creativity", "delegation", "communication", "decision_making"],
+  "styles": {
+    "R": {
+      "label": "Results",
+      "summary": "Moves things forward, enjoys a challenge and measures progress by outcomes.",
+      "leadership": { "strength": "Gives clear direction and keeps momentum when a goal is in sight.", "limitation": "Can push pace harder than the team can sustain." },
+      "goal_setting": { "strength": "Sets stretching, concrete targets and owns them.", "limitation": "May skip agreeing the target with others first." },
+      "creativity": { "strength": "Generates bold options when the usual route is blocked.", "limitation": "Drops ideas quickly if they do not pay off fast." },
+      "delegation": { "strength": "Hands over whole outcomes rather than single tasks.", "limitation": "Takes work back when others seem slow." },
+      "communication": { "strength": "Direct and to the point; people know where they stand.", "limitation": "Can sound abrupt; may not check how a message landed." },
+      "decision_making": { "strength": "Decides quickly with incomplete information.", "limitation": "Can commit before the facts that matter are in." }
+    },
+    "A": {
+      "label": "Affiliative",
+      "summary": "Energised by people, persuasive and quick to build rapport.",
+      "leadership": { "strength": "Creates enthusiasm and a sense of belonging in a group.", "limitation": "May avoid hard conversations to keep the mood positive." },
+      "goal_setting": { "strength": "Makes goals feel shared and worth chasing.", "limitation": "Goals can stay inspiring but vague." },
+      "creativity": { "strength": "Builds on others' ideas and connects people who should meet.", "limitation": "Can chase the newest idea before finishing the last." },
+      "delegation": { "strength": "Matches tasks to people's interests and motivates them.", "limitation": "Follow-up on details can slip." },
+      "communication": { "strength": "Warm, expressive and good at reading the room.", "limitation": "May talk through a point when listening would help more." },
+      "decision_making": { "strength": "Brings people along so decisions stick.", "limitation": "Can be swayed by the most recent or most liked voice." }
+    },
+    "P": {
+      "label": "Paced",
+      "summary": "Steady, patient and dependable; values consistency and cooperation.",
+      "leadership": { "strength": "Builds trust and a calm, reliable team rhythm.", "limitation": "May hold back from stepping forward when a change is needed." },
+      "goal_setting": { "strength": "Sets realistic goals and sticks with them over time.", "limitation": "Can under-stretch to avoid disruption." },
+      "creativity": { "strength": "Improves existing processes patiently and practically.", "limitation": "Slower to embrace radical change." },
+      "delegation": { "strength": "Supports others and checks in kindly.", "limitation": "May keep work to avoid burdening others." },
+      "communication": { "strength": "A good listener who makes others feel heard.", "limitation": "May not voice disagreement until late." },
+      "decision_making": { "strength": "Considers the impact on everyone involved.", "limitation": "Needs time; can delay under pressure to decide fast." }
+    },
+    "D": {
+      "label": "Detail",
+      "summary": "Careful, analytical and quality-minded; likes to get things right.",
+      "leadership": { "strength": "Sets high standards and leads through expertise.", "limitation": "Can over-control the details of others' work." },
+      "goal_setting": { "strength": "Breaks goals into precise, checkable steps.", "limitation": "Can plan for longer than needed before starting." },
+      "creativity": { "strength": "Finds elegant solutions through deep analysis.", "limitation": "May reject ideas that are not yet fully worked out." },
+      "delegation": { "strength": "Gives clear specifications and quality criteria.", "limitation": "Finds it hard to accept 'good enough'." },
+      "communication": { "strength": "Accurate, well-reasoned and well-prepared.", "limitation": "Can come across as reserved or overly technical." },
+      "decision_making": { "strength": "Weighs evidence thoroughly and avoids careless errors.", "limitation": "Can stall waiting for certainty." }
+    }
+  }
+}

@@ -27,32 +27,34 @@ Key facts, consent status (disclaimer, guardian, Swadharma), progress and upcomi
 
 ### Assessments
 - Status of each instrument and its validity flags: very fast answers (median < 1.5 s), straight-lining (10+ identical in a row), high social desirability, large self-vs-others gap.
-- **Re-administer** an instrument when results are invalid: the old session is invalidated and the candidate gets a fresh one.
+- **Re-administer** an instrument when results are invalid: confirm in the dialog, the old session is invalidated and the candidate gets a fresh one. The row shows how many earlier attempts were invalidated.
 
 ### Profile
-Edit the plain-language narrative (strengths, watch-outs, themes) and **Approve**. Until you approve, the candidate and parent cannot see any results.
+Charts of interests, aptitude percentiles and work-style graphs (others / stress / self). Edit the plain-language narrative (summary, strengths, watch-outs, themes) and **Approve**. Until you approve, the candidate and parent cannot see any results.
 
 ### Swadharma 🔒
 Visible only to you and admins, and only if the candidate opted in with consent.
 - Chart summary, the 15-family points table with component breakdown and confidence, personality lens, agreement matrix vs the psychometric top 5, favourable windows.
 - **Counsellor notes** is the only field you can edit.
-- **Release Swadharma Report**: choose candidate, parent or both and enter a reason. A release is **permanent and logged**; it cannot be undone. Generate the Swadharma report first. See [SOP-O6](../sops/operations-sops.md#sop-o6-releasing-a-swadharma-report).
+- If the birth time is unknown, only the Moon-sign and dignity components run and confidence shows **low**.
+- **Release Swadharma Report**: pick the generated Swadharma report, choose candidate, parent or both, enter a reason and tick the box confirming you understand it cannot be undone. A release is **permanent and logged** with your name and reason. Generate the Swadharma report first. See [SOP-O6](../sops/operations-sops.md#sop-o6-releasing-a-swadharma-report).
 
 Never use Swadharma to rule out a career, and never discuss health, marriage, longevity or wealth.
 
 ### Options
 - Ranked careers (student/professional) or streams (early_explorer) from the matching engine.
-- **Pin**, **Hide** or **Add** options, then switch **Publish to candidate** on. Hidden options never show to the family. Swadharma points are stripped from everything the family sees.
+- Each row shows the fit score and a breakdown bar (interest, aptitude, work style, values, outlook, feasibility; for streams: interest, aptitude, academics, breadth, board). The 🔒 Swadharma column is for you only.
+- **Pin**, **Hide** or **Add from library**, then switch **Publish to candidate** on. Re-running the matcher keeps your pins, hides and additions. Hidden options never show to the family. Swadharma points are stripped from everything the family sees.
 - For early explorers, keep the widest "keep options open" stream in the list and never present a single career.
 
 ### Sessions
-Schedule (video, in person, phone) with a meeting URL. Use the ICCC-stage note template. **Private notes** are never visible to the family; write what they should see in **Summary for candidate** and add action items.
+Schedule (video, in person, phone) with a meeting URL. Pick the ICCC stage and press **Insert template** to start your notes from it. **Private notes** are never visible to the family; write what they should see in **Summary for candidate** and add action items.
 
 ### Roadmap
 Pick a template (class8_10_exposure, class11_12, ug, pg_prep, transition, custom), edit items (kind, owner, due date), then **Publish**. The family sees the roadmap only after it is published. Overdue items become Missed overnight and you are notified.
 
 ### Reports
-Generate candidate, candidate_junior, parent, stream_choice, case_file or swadharma. Each generation creates a **new version**; reports cannot be edited or deleted. Case files and Swadharma reports stay counsellor-only (a Swadharma report reaches the family only through a release). Download through a signed link valid for 15 minutes.
+Generate candidate, candidate_junior, parent, stream_choice, case_file or swadharma. The PDF is rendered by the worker, usually within a minute or two; **Download** appears once it is ready. Each generation creates a **new version**; reports cannot be edited or deleted. Case files and Swadharma reports stay counsellor-only (a Swadharma report reaches the family only through a release). Download through a signed link valid for 15 minutes.
 
 ### Documents
 Files shared with the case, including roadmap evidence uploaded by the candidate.

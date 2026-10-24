@@ -1,0 +1,70 @@
+@import 'tailwindcss';
+
+@custom-variant junior (&:where([data-track='early_explorer'], [data-track='early_explorer'] *));
+
+@theme {
+  --font-sans: 'Source Sans 3', ui-sans-serif, system-ui, sans-serif;
+  --font-friendly: 'Nunito', 'Source Sans 3', ui-sans-serif, sans-serif;
+
+  /* deep teal */
+  --color-pine-50: #eef7f6;
+  --color-pine-100: #d5ebe9;
+  --color-pine-200: #a9d4d1;
+  --color-pine-300: #74b5b1;
+  --color-pine-400: #43918e;
+  --color-pine-500: #23736f;
+  --color-pine-600: #155e5d;
+  --color-pine-700: #0f5257;
+  --color-pine-800: #0c3f43;
+  --color-pine-900: #082c2f;
+
+  /* warm sand */
+  --color-sand-50: #fdfaf4;
+  --color-sand-100: #f8f0e2;
+  --color-sand-200: #f3e6cf;
+  --color-sand-300: #e8d3ad;
+  --color-sand-400: #d9b77f;
+  --color-sand-500: #c79a55;
+
+  --color-saffron-400: #e9b26b;
+  --color-saffron-500: #e0a458;
+  --color-saffron-600: #c4843a;
+
+  --color-ink: #1d2b2c;
+  --color-muted: #5b6b6c;
+  --color-line: #e4ddd0;
+  --color-danger: #b4432f;
+  --color-ok: #2f7d4f;
+}
+
+html {
+  font-size: 17px;
+  background: var(--color-sand-50);
+  color: var(--color-ink);
+}
+
+/* early_explorer: larger type, rounder face, friendlier spacing */
+html[data-track='early_explorer'] {
+  font-size: 19.5px;
+}
+html[data-track='early_explorer'] body {
+  font-family: var(--font-friendly);
+}
+
+body {
+  font-family: var(--font-sans);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-saffron-500);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

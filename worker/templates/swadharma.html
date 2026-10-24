@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% import "_macros.html" as m with context %}
+{% block body %}
+{{ m.cover("Swadharma report", "A traditional Vedic lens on career leanings, offered for reflection.") }}
+<h2>Please read first</h2>
+<div class="disclaimer-full">{{ disclaimer }}</div>
+<p>This report sits alongside, never above, the psychometric profile and your own judgement. Points describe how strongly the traditional indicators lean towards each family. A low number never rules a family out.</p>
+<h2 class="page-break">Your Swadharma lens</h2>
+{% if swadharma and swadharma.families %}{{ m.swadharma_block(swadharma, False) }}{% else %}<p class="muted">No analysis available.</p>{% endif %}
+{% endblock %}

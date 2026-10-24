@@ -3,9 +3,9 @@
 | Field | Value |
 |---|---|
 | Document | LLD |
-| Version | 1.0 |
+| Version | 1.1 |
 | Last updated | 2026-10-24 |
-| Code baseline | `supabase/migrations/001_init.sql` on `feat/start-here` @ `6177c0a`. Sections marked *planned* describe the spec until that code is merged. |
+| Code baseline | `feat/start-here`: migration, Edge Functions, web app and worker (Start Here scope). |
 | Related | [BRD](../brd/BRD.md) · [HLD](HLD.md) |
 
 > This document must change in the same pull request as any change to tables, columns, constraints, policies, functions, triggers, views, RPCs, engine formulas, report templates, jobs or environment variables.
@@ -16,13 +16,14 @@
 
 | Path | Contents | Status |
 |---|---|---|
-| `src/` | React app (Vite). `src/lib/supabase.ts` client | scaffold |
+| `src/` | React app (Vite + TS, Tailwind v4, shadcn-style components in `src/components/ui`, Recharts). `src/lib/supabase.ts` client; `src/lib/api/` data layer | implemented (Start Here routes) |
 | `supabase/migrations/001_init.sql` | Schema, constraints, helpers, RLS, triggers, views, RPCs, storage, generated seed | implemented |
 | `supabase/seed/` | `build_seed.py`, `instruments.py`, `library.py` — regenerate the seed block of the migration | implemented |
 | `supabase/tests/` | `run.sh`, stub, fixtures, `rls_test.sql`, `owner_test.sql` | implemented |
-| `supabase/functions/score_instrument/` | Edge Function | planned |
-| `supabase/functions/generate_signed_report_url/` | Edge Function | planned |
-| `worker/` | `scoring.py`, `match.py`, `streams.py`, `swadharma.py`, `reports.py`, `scheduler.py`, `karakatwa.json` | planned |
+| `supabase/functions/_shared/` | `scoring.ts` (TS scorer), `scoring_fixtures.json` (shared with the worker), `workstyle_templates.json`, `cors.ts` | implemented |
+| `supabase/functions/score_instrument/` | Edge Function | implemented |
+| `supabase/functions/generate_signed_report_url/` | Edge Function | implemented |
+| `worker/` | `scoring.py`, `match.py`, `streams.py`, `swadharma.py`, `reports.py` + `templates/`, `scheduler.py`, `db.py`, `families.py`, `karakatwa.json`, `data/workstyle_templates.json`, `Dockerfile`, `railway.json`, `tests/` | implemented |
 | `docs/` | This documentation set | implemented |
 
 ## 2. Configuration
@@ -31,6 +32,9 @@
 |---|---|---|
 | `VITE_SUPABASE_URL` | Web (Vercel) | Supabase project URL |
 | `VITE_SUPABASE_ANON_KEY` | Web (Vercel) | Public anon key (RLS applies) |
+| `VITE_DEMO_MODE` | Web | `true` runs the UI on in-memory demo data (also automatic when the two variables above are missing). Never set in production |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Worker (Railway) | Service-role client in `worker/db.py` |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Edge Functions | Provided by the Supabase runtime |
 | Vault `project_url` | Supabase Vault | Base URL used by `private.invoke_edge_function` |
 | Vault `service_role_key` | Supabase Vault | Bearer for Edge Function calls from triggers |
 | Service-role key | Worker, Edge Functions | Full access; never in the browser |
@@ -57,7 +61,7 @@ All tables are in `public`, have `id uuid default gen_random_uuid()` unless keye
 | `stream_options` | `name`, `board`, `subjects` text[], `keeps_open_families`, `closes_families` text[], `notes` |
 | `career_matches` | `candidate_id`, `career_id`, `fit_score`, `breakdown` jsonb, `rank`; `counsellor_action` ∈ pinned, hidden, added; `visible_to_candidate` default false; `match_version` |
 | `stream_matches` | as above with `stream_option_id` |
-| `swadharma_charts` 🔒 | PK `candidate_id`; `ayanamsa`, `d1`, `d9`, `d10`, `kp_cusps`, `ashtakavarga`, `dashas` jsonb; `computed_at`, `engine_version` |
+| `swadharma_charts` 🔒 | PK `candidate_id`; `ayanamsa`, `d1`, `d9`, `d10`, `kp_cusps`, `ashtakavarga`, `dashas` jsonb; `computed_at`, `engine_version`; `insights` jsonb (additive: personality lens, agreement matrix, component detail) |
 | `swadharma_scores` 🔒 | `career_family`, `points`, `max_points` default 100, `components`, `favourable_windows` jsonb; `confidence` ∈ high, medium, low; `counsellor_notes` |
 | `swadharma_releases` (append-only) | `candidate_id`, `released_by`, `released_to` ∈ candidate, parent, both; `reason` not null; `report_id`; `released_at` |
 | `sessions` | `candidate_id`, `counsellor_id`, `scheduled_at`, `duration_min` default 60, `mode` ∈ video, in_person, phone; `meeting_url`; `iccc_stage` ∈ know_self, know_world, decide, plan, act, review; `notes_private`, `summary_for_candidate`, `action_items` jsonb; `attended` |
@@ -164,7 +168,7 @@ C = candidate (own), P = parent (linked), Co = assigned counsellor, A = admin, S
 | RPC | Input | Output | Rules |
 |---|---|---|---|
 | `my_instruments()` | — | rows: instrument_id, code, name, track_variant, time_limit_min, item_count, est_minutes, session_id, status, answered | Active instruments for caller's track variant (early_explorer → junior); latest non-invalidated session; est = time limit or 12 s per item |
-| `next_item(session_id, position?)` | uuid, int | `{done, position, total, section{code,name,time_limit_sec,started_at,server_now,index,count}, item{id,type,prompt,options[{value,label}]}, answer}` | Caller must own the session and it must be in progress. Null position = first unanswered. Timed section: clock starts on first served item; after limit + 5 s, skips to next section; going back before the furthest answered item raises 22023 |
+| `next_item(session_id, position?)` | uuid, int | `{done, position, total, section{code,name,time_limit_sec,started_at,server_now,index,count}, item{id,type,prompt,options[{value,label}]}, answer}` | Caller must own the session and it must be in progress. Null position = first unanswered. Timed section: clock starts on first served item (stored server-side in `responses._meta.section_started`); once `now() >= started + limit` it skips to the next section (no grace); going back before the furthest answered item raises 22023 |
 | `save_responses(session_id, responses)` | uuid, `{item_id: {a, rt}}` | int (saved count) | Drops unknown items and answers in timed sections whose clock is not started or ended more than 30 s ago |
 | `complete_assessment(session_id, device?)` | uuid, text | void | Sets completed, `completed_at`, `duration_sec`; fires scoring trigger |
 | `accept_disclaimer()` | — | timestamptz | Sets `disclaimer_accepted_at` on caller's candidate row; audit `disclaimer_accepted` |
@@ -177,109 +181,154 @@ Error codes surfaced to the UI: `42501` not permitted, `22023` invalid input/sta
 
 | Bucket | Public | Path | Access |
 |---|---|---|---|
-| `reports` | no | `reports/<candidate_id>/<kind>-v<version>.pdf` (*convention, confirm with worker*) | No client policy; read only via 15-minute signed URL from `generate_signed_report_url` |
+| `reports` | no | `<candidate_id>/<kind>-v<version>-<report id first 8>.pdf` | No client policy; read only via 15-minute signed URL from `generate_signed_report_url` |
 | `documents` | no | `<candidate_id>/<file>` | Read: family, assigned counsellor, admin. Insert: the candidate or a manager. Used for roadmap evidence and case documents |
 
-## 9. Engine rules (worker; *planned* — source of truth until code lands)
+## 9. Engine rules (worker)
 
-### 9.1 Scoring (`worker/scoring.py`, mirrored in `score_instrument`)
+Shared constants live in `worker/families.py` (15 families, a RIASEC profile per family, aptitude band ranks).
 
-| Instrument | Rule |
-|---|---|
-| Interest | Sum per RIASEC scale → percentile by age band → 3-letter code (top 3) + normalised 6-vector |
-| Aptitude | Raw per sub-test → percentile by age band (13–15, 16–18, 19–22, 23+) → Low < 25, Average 25–74, High 75–89, Very High ≥ 90 |
-| Work-style (R-A-P-D) | Forced choice most/least; 3 graphs standard (others, stress, self), 2 junior; each factor −19…+19; primary = highest above midline, secondary = next |
-| Big Five | Standard only; BFI-2-S → 5 percentiles |
-| Values | Pairwise choice → top 5 + vector; junior uses 12-item school-values |
+### 9.1 Scoring (`worker/scoring.py`, mirrored in `supabase/functions/_shared/scoring.ts`)
 
-Work-style pattern flags: span (max−min ≥ 20 wide, ≤ 8 crunched); reversal (primary differs graph 1 vs 3); undershift (all ≤ 2); overshift (≥ 3 above midline); mercurial (A ≥ 8 above others); flick_up (P, D < 0 and D > P); flick_down (P, D < 0 and D < P). Stress: P moves ≥ 3 graph3→graph2 = personal; graph3→graph1 = performance; A moving with it = relationship. Strengths/limitations table per primary style across leadership, goal-setting, creativity, delegation, communication, decision-making from original template text.
+Both scorers are checked against the same 27 cases in `supabase/functions/_shared/scoring_fixtures.json` (`npx vitest run supabase/functions`, `pytest worker/tests/test_scoring.py`). Rounding is JavaScript-compatible in both. `SCORING_VERSION = scoring-0.1`.
 
-Validity flags: median response time < 1.5 s; straight-lining ≥ 10 consecutive; social desirability > 80th percentile; self-vs-others divergence ≥ 12 on any factor.
+Responses are `{item_id: {a, rt}}`; `_meta` is ignored. Age bands 13–15, 16–18, 19–22, 23+ (unknown DOB → 16–18). Percentile = normal CDF from the instrument's `norms[band][scale] = {mean, sd}`, clamped 1–99.
 
-### 9.2 Career matching (`worker/match.py`) — student, professional
+| Method (`scoring_spec.method`) | Instruments | Rule |
+|---|---|---|
+| `riasec` | interest | Sum per scale → percentile → order by percentile, raw, R-I-A-S-E-C → `code` (top 3), `vector` = (raw − n)/(4n) per scale |
+| `aptitude` | aptitude | Correct answers per section → percentile → band Low < 25 ≤ Average < 75 ≤ High < 90 ≤ Very High |
+| `workstyle` | workstyle | Forced choice most/least over factors R (Results), A (Affiliative), P (Paced), D (Detail). With N valid items: others = (most − N/4)/(3N/4)·19, stress = (N/4 − least)/(3N/4)·19, self = (most − least)/N·19, each clamped ±19. Junior keeps others and self only. Primary/secondary = highest positive self values. Style table from `workstyle_templates.json` |
+| `bigfive` | bigfive | Mean per domain (reverse-keyed 6 − a) → percentiles; `SD` scale gives social desirability |
+| `values` | values, school_values | Pair wins per value → ranking, `top5` (`scoring_spec.top`), vector = wins/appearances |
+| `likert_scales` | learning, subject_enjoyment | Mean per scale (sum when `per_item`) → order and top |
+
+Work-style patterns: span wide ≥ 20 / crunched ≤ 8; reversal (primary of others ≠ primary of self); undershift (all self ≤ 2); overshift (≥ 3 positive); mercurial (A − max(R, P, D) ≥ 8); flick_up / flick_down (P, D < 0 and D > P / D < P). Standard only, stress: P moves ≥ 3 self→stress = personal, self→others = performance; A moving ≥ 3 the same way = relationship.
+
+Validity flags: `fast_responses` (median rt < 1.5 s), `straight_lining` (≥ 10 identical consecutive Likert answers), `incomplete` (< 80 % answered), `social_desirability` (Big Five SD > 80th percentile), `divergence` (|others − self| ≥ 12 on any work-style factor).
+
+`score_pending` scores completed sessions that have no result since `completed_at` (fallback when the Edge Function call fails). `build_profile` upserts the four `profile_summary` vectors and `updated_at`; it never touches the narrative or approval.
+
+### 9.2 Career matching (`worker/match.py`, `match-0.1`) — student, professional
 
 ```
 fit = 35·cosine(interest_vector, career.interest_weights)
     + 25·aptitude_fit + 15·workstyle_fit + 10·values_fit
-    + 10·outlook_score + 5·constraints_feasible
-outlook_score: growing 1.0, transforming 0.7, stable 0.6, declining 0.2   (i.e. 10/7/6/2 points)
-aptitude_fit  = share of career.aptitude_min bands met, +0.1 per band exceeded, max 1.0
-workstyle_fit = 1 − normalised distance of candidate primary/secondary to career.workstyle_fit
-values_fit    = overlap of candidate top-5 values with career.values_fit
+    + outlook points (growing 10, transforming 7, stable 6, declining 2)
+    + 5·constraints_feasible
+aptitude_fit  = share of career.aptitude_min bands met + 0.1 per band level exceeded, max 1
+workstyle_fit = 1 − (dp + ds): dp 0 if primary is the career's first style, 0.25 if listed, 0.5 otherwise;
+                ds 0 if secondary is listed, 0.25 if none, 0.5 otherwise; 0.5 when either side is missing
+values_fit    = |top-5 ∩ career.values_fit| / min(5, |career.values_fit|)
+constraints   = 0 when the career's family is in candidates.constraints.exclude_families
 ```
 
-Top 15 → `career_matches` with `breakdown {interest, aptitude, workstyle, values, outlook, constraints, swadharma}` and templated explanation per dimension; `visible_to_candidate = false`.
+The interest vector comes from `profile_summary` (falls back to the latest interest result). Top 15 by fit are upserted into `career_matches` with `rank`, `match_version`, and `breakdown {interest, aptitude, workstyle, values, outlook, constraints, explanation{…}, swadharma?}`. Re-runs keep `counsellor_action` and `visible_to_candidate`; rows that drop out of the top 15 are deleted only when the counsellor has not acted on them and they are unpublished.
 
-### 9.3 Stream recommendation (`worker/streams.py`) — early_explorer
+### 9.3 Stream recommendation (`worker/streams.py`, `streams-0.1`) — early_explorer
 
 ```
-stream_fit = 35·interest alignment (RIASEC vector vs families the stream keeps open)
-           + 30·aptitude fit   (PCM numerical+abstract; PCB verbal+abstract;
-                                Commerce numerical+verbal; Humanities verbal+abstract;
-                                Design/vocational spatial+abstract)
-           + 20·academics and subject enjoyment (maths, science, languages, social science, art)
-           + 10·breadth (keeps_open count / max)
-           + 5·board availability
+stream_fit = 35·cosine(interest_vector, mean RIASEC profile of the families the stream keeps open)
+           + 30·mean aptitude percentile of the stream's sub-tests / 100
+               (PCMB numerical+abstract+verbal; PCM numerical+abstract; PCB verbal+abstract;
+                Commerce numerical+verbal; Humanities verbal+abstract; Design/Vocational spatial+abstract)
+           + 20·mean over key subjects of (marks % and (enjoyment − 1)/4)
+           + 10·keeps_open count / widest count
+           + 5·board match
 ```
 
-Always include the widest "keep options open" combination; output keeps_open/closes and 3 sample careers per open family; never a single career.
+Enjoyment comes from `subject_enjoyment` rows, filled in from the "Subjects I enjoy" instrument where the counsellor has not entered a value. Missing data scores 0.5 for that part. Top 5 plus the widest stream if it is not already there (5–6 rows). Breakdown carries `keeps_open`, `closes`, up to 3 `sample_careers` per open family, `widest`, and the counsellor-only `swadharma` roll-up (sum of family points over `keeps_open`).
 
-### 9.4 Swadharma (`worker/swadharma.py`)
+### 9.4 Swadharma (`worker/swadharma.py`, `swadharma-0.1`)
 
-Runs only if `swadharma_opted_in` and `birth_details.consent_at`. Swiss Ephemeris, Lahiri; Placidus cusps for KP; whole-sign for Parashari. `time_certainty = unknown` → Moon-sign and dignity components only, confidence low.
+Runs only when `candidates.swadharma_opted_in` and `birth_details.consent_at` are set (and lat/lng exist). Swiss Ephemeris (Moshier, no data files), Lahiri sidereal; whole-sign houses for Parashari work, Placidus cusps for KP. Local birth time is converted with the IANA `tz` (default Asia/Kolkata).
 
-Points per family (max 100): D10 (25) · KP 10th cusp sub-lord (20) · Ashtakavarga (20; SAV ≥ 28 full, 25–27 × 0.6, < 25 × 0.3) · planetary strength (15) · yogas (10) · dasha timing over next 10 years (10, plus `favourable_windows`). Planet → family map in `worker/karakatwa.json`.
+Chart (`compute_chart`): nine grahas (mean node; Ketu = Rahu + 180°), sign, whole-sign house, D9 = `floor(lon·9/30) mod 12`, D10 (3° parts; odd signs from the sign, even signs from the 9th), dignity (exalted 1.0, own 0.85, friend 0.65, neutral 0.5, enemy 0.35, debilitated 0.15; nodes borrow Saturn/Mars relationships), retrograde, combustion (standard orbs), nakshatra, pada, star-lord, KP sub-lord (Vimshottari proportions inside the star), KP house.
 
-15 families: Engineering & Technology · Medicine & Health · Pure Sciences & Research · Mathematics, Finance & Analytics · Law & Governance · Public Service & Defence · Business, Management & Entrepreneurship · Sales, Marketing & Media · Arts, Design & Performance · Writing, Communication & Languages · Education & Counselling · Social Work & Spirituality · Agriculture, Environment & Earth · Hospitality, Travel & Service · Skilled Trades & Crafts.
+Ashtakavarga: classical BAV tables for the seven planets (totals 48, 49, 39, 54, 56, 52, 39); SAV always sums to 337 (tested). Strength: a Shadbala *proxy* (0.4 dignity, 0.25 directional, 0.15 natural, 0.2 motional/paksha), labelled as such in the output.
 
-early_explorer: roll up per stream over `keeps_open_families`; lens phrased for parents of a 13–15-year-old; windows limited to board-exam years and Class 11 entry.
+Components per family, each a 0–1 score × weight. `K[p][f]` is the karakatwa weight from `worker/karakatwa.json` (editable; read at run time).
 
-Outputs personality lens (never health, marriage, longevity, wealth; never prohibitions) and agreement matrix (Agree / Partial / Conflict) vs psychometric top 5. Writes only `swadharma_charts`, `swadharma_scores` and `career_matches.breakdown.swadharma`.
-
-### 9.5 Reports (`worker/reports.py`)
-
-| Kind | Audience | Notes |
+| Component | Weight | Score |
 |---|---|---|
-| candidate | Candidate (student/professional) | Full interpreted profile and options |
-| candidate_junior | Early explorer | Visual, ~8 pages, written to the student, "leanings" not "types" |
-| parent | Parent | 2 pages |
-| stream_choice | Early explorer family | Stream cards, keeps-open/closes |
-| case_file | Counsellor only | Everything incl. Swadharma; `visible_to` forced to counsellor |
-| swadharma | Counsellor until released | Full disclaimer on page 1 |
+| D10 | 25 | Weighted mean of K × D10 dignity over the D10 lagna lord (1.0), D10 10th lord (1.0) and planets in the D10 lagna and 10th (0.8 each) |
+| KP 10th sub-lord | 20 | Sub-lord SL, its star-lord STL; significations = houses occupied/owned by STL and SL (nodes add their sign lord). strength = share of {2, 6, 10, 11} signified. Score = (0.5 + 0.5·strength)·(½K[SL] + ½K[STL]) + 0.15 service bias (6th signified: Public Service, Law, Education, Medicine) + 0.15 business bias (7th: Business, Sales & Media, Hospitality). Also records `study_location_lean` (9th/12th vs 4th) |
+| Ashtakavarga | 20 | 0.4·mean SAV factor of houses 10, 2, 6, 11 (≥ 28 → 1, 25–27 → 0.6, < 25 → 0.3) + 0.4·K-weighted BAV of planets in the 10th sign / 8 + 0.2·10th lord's BAV / 8 (halved when the 10th lord does not signify the family) |
+| Planetary strength | 15 | Proxy rank score (7 − rank)/7, +0.15 exalted/own, −0.15 combust or uncancelled debility; K-weighted; +0.1·K of Atmakaraka and of Amatyakaraka |
+| Yogas | 10 | Σ yoga strength × mean K of the planets involved: Budhaditya 0.5, Gaja-Kesari 0.5, Neecha-bhanga 0.4, Saraswati 0.6, Dharma-Karmadhipati 0.7, Raja/Dhana with the 10th lord 0.5, Parivartana with the 10th lord 0.6 |
+| Dasha timing | 10 | Antardashas over the next 10 years, time-weighted: ½·K of each lord that signifies a career house (KP significations when cusps exist) ×1.5, capped at 1 |
 
-Flow: counsellor inserts `reports` row → worker renders with WeasyPrint → uploads to `reports/` → sets `pdf_path` once. Every PDF carries the disclaimer.
+Unknown birth time (`time_certainty = unknown`): chart cast for 12:00 local; only "moon_sign" (10th from the Moon, its lord and occupants, by D1 dignity; weight 25) and strength (weight 15, no directional part) run, rescaled so the maximum is still 100. Confidence: exact → high, approx_15m → medium, approx_1h and unknown → low.
+
+Favourable windows: antardasha periods in the next 10 years where both lords signify a career house; purpose from the antardasha lord's houses (exams 4/5/6/9/11, job change 6/10/11, launch 7/10/11). early_explorer: windows are clipped to the Class 10 board season (15 Jan – 31 Mar), Class 11 entry (Apr – Jun) and the Class 12 board season, derived from the current class (or DOB + 16), with no career wording.
+
+Personality lens: lagna (time known), Moon sign, Sun sign and lagna lord → tendencies, strengths and watch-outs from an original 12-sign table, written after "You may" or, for early_explorer, "Your child may". A test rejects health, marriage, longevity, wealth and prohibition words (`BANNED_TERMS`).
+
+Agreement matrix: families ranked by Swadharma points vs psychometric rank (best career fit per family, then interest alignment). Agree = both top 5; Partial = top 5 on one side and top 8 on the other; Conflict = top 5 on one side and rank ≥ 11 on the other; otherwise "—".
+
+Writes: `swadharma_charts` (upsert; `insights` = lens, agreement, component detail, yogas, confidence, weights), `swadharma_scores` (one row per family, updated in place so `counsellor_notes` survive), and the `swadharma` key of `career_matches.breakdown` / `stream_matches.breakdown`. Nothing else.
+
+### 9.5 Reports (`worker/reports.py`, `worker/templates/`)
+
+| Kind | Template | Content |
+|---|---|---|
+| candidate | `candidate.html` | Interests, aptitude, work style and style table, values, counsellor summary, published career options (top 10) with explanations, roadmap, shared session summaries |
+| candidate_junior | `candidate_junior.html` | Eight pages written to the student in "leanings" language (no Holland code), streams, next steps |
+| parent | `parent.html` | Two pages: summary tiles, values, options (top 5 careers or 3 streams), key dates, how to help, counsellor contact |
+| stream_choice | `stream_choice.html` | Stream cards with keeps-open / harder-later families and examples, basis, roadmap |
+| case_file | `case_file.html` | Everything: all matches incl. unpublished with breakdown and Swadharma column, private notes, roadmap, full Swadharma section with components and counsellor notes |
+| swadharma | `swadharma.html` | Page 1 = full disclaimer and framing; then family points, lens, agreement, windows (no counsellor notes, no dasha names) |
+
+Every page carries the verbatim disclaimer in the footer. `assemble()` strips `breakdown.swadharma`, unpublished and hidden matches, draft roadmaps and `notes_private` from every kind except case_file, whatever data is passed in (tested). Flow: the counsellor inserts a `reports` row (`content.status = requested`) → `render_pending` builds the context, renders with WeasyPrint, uploads to the `reports` bucket and sets `pdf_path` with `content = {status: rendered, rendered_at, renderer, snapshot}` exactly once.
 
 ### 9.6 Jobs (`worker/scheduler.py`)
 
-Nightly: missed-item nudges (complements the SQL job), report SLA check, outcome reminders at 6/12/24 months. Quarterly: outlook refresh reminder to admin.
+| Schedule (Asia/Kolkata) | Job | Behaviour |
+|---|---|---|
+| every minute | `job_score_pending` | `scoring.score_pending` |
+| every minute | `job_refresh_candidates` | When a result is newer than `profile_summary.updated_at`: build profile, then `match.run` or `streams.run`. When opted in and `consent_at` is newer than the chart: `swadharma.run` |
+| every minute | `job_render_reports` | `reports.render_pending` |
+| every minute | `job_deliver` | Marks unsent notifications as sent and logs them (email/SMS hook point) |
+| 02:15 daily | `job_report_sla` | `v_caseload` rows past `report_due_at` with no report → `report_sla` notification to the counsellor and admins |
+| 02:15 daily | `job_outcome_reminders` | 6 / 12 / 24 months (182 / 365 / 730 days) after `roadmaps.published_at`, with no outcome at that checkpoint → `outcome_<cp>` notification to the counsellor |
+| 1 Jan / Apr / Jul / Oct 09:00 | `job_outlook_refresh` | Careers with `last_reviewed` null or older than 90 days → admin notification |
 
-## 10. Frontend design (*planned*)
+Notifications are upserted on (`user_id`, `kind`, `entity_id`) with ignore-duplicates, so repeats are no-ops. Missed roadmap items themselves are marked by the pg_cron job (§5.1). `python scheduler.py --once` runs every job once.
+
+### 9.7 Edge Functions
+
+| Function | Auth | Behaviour |
+|---|---|---|
+| `score_instrument` | Service-role bearer (from the trigger) or the session owner's JWT | Loads session + instrument with the service key, scores with `_shared/scoring.ts`, inserts `assessment_results`; idempotent (skips when a result exists since `completed_at`) |
+| `generate_signed_report_url` | User JWT | Reads the report row with the caller's JWT so RLS decides access; 404 when not visible or no PDF yet; returns a 15-minute signed URL and writes `audit_log` `report_download` |
+
+## 10. Frontend design
 
 | Concern | Design |
 |---|---|
-| Routing | React Router; role guard reads `users.role` and redirects to role home |
-| Data | supabase-js with RLS; candidates use `v_candidate_*` views and RPCs |
-| Test runner | Calls `my_instruments` → insert session → `next_item` loop; local buffer flushed to `save_responses` every 30 s and on navigation; timer from `section.started_at` and `server_now` (server clock wins); no back button inside timed sections |
-| Track switch | `early_explorer` → larger type scale, illustrations, friendlier copy, stepper Onboard → Discover → Talk → Streams → Explore Plan |
-| Theme | Deep teal + warm sand, large readable type |
-| Errors | Map 42501 → "You don't have access to this", 22023 → specific validation copy, P0429 → "Please try again in a while" |
+| Routing | React Router (`src/App.tsx`). `/cases`, `/cases/:id?tab=…` (counsellor, admin), `/me`, `/me/assess`, `/me/assess/:instrument` (candidate). Other routes render a placeholder until built. `RequireRole` redirects to the role home (`HOME_FOR_ROLE`) |
+| Data layer | `src/lib/api/api.ts` interface with `supabaseApi.ts` (RLS, views, RPCs) and `demoApi.ts` (in-memory). `main.tsx` picks one by `DEMO_MODE` before rendering; demo personas sign in from the login page |
+| Case tabs | Overview · Assessments (re-administer) · Profile (charts, narrative, approve) · Swadharma 🔒 (counsellor/admin only; points, components, notes, lens, agreement, windows, Release dialog with reason and irreversibility checkbox) · Options (pin/hide/add, publish switch, counsellor-only Swadharma column) · Sessions (ICCC templates, private notes, summary, actions, attendance) · Roadmap (template, items, publish/pause/complete) · Reports (request, versions, signed download) · Documents |
+| Test runner | `my_instruments` → session → `next_item` loop; one item per screen; answers buffered and flushed to `save_responses` every 30 s, after each timed answer, on tab hide/pagehide and on exit; countdown from `started_at` and `server_now` (server wins); Back only in untimed sections; keyboard 1–5 / Enter; forced choice picks most and least |
+| Track switch | `TrackProvider` sets `html[data-track]`; Tailwind `junior:` variant; `COPY` dictionary per track. early_explorer: base type 19.5 px (17 px otherwise), friendlier copy, illustrations, stepper. Staff (and demo) can preview either track |
+| Theme | Tokens in `src/index.css`: pine (deep teal), sand, saffron |
+| Errors | `ErrorBox` maps 42501 → no access, 22023 → validation message, P0429 → try again later |
 
 ## 11. Testing
 
-```bash
-PGHOST=localhost PGUSER=postgres ./supabase/tests/run.sh
-```
+| Suite | Command | Covers |
+|---|---|---|
+| SQL | `PGHOST=localhost PGUSER=postgres PGPASSWORD=postgres bash supabase/tests/run.sh` | RLS per role, triggers, RPCs, under-18 gate, append-only and write-once rules (`rls_test.sql` as `authenticator`, `owner_test.sql` as owner) |
+| Web + TS scorer | `npx vitest run` | Runner buffer/timer helpers, TS scorer against the shared fixtures |
+| Types / build | `npx tsc -b && npx vite build` | Web app |
+| Edge Functions | `deno check supabase/functions/*/index.ts` | Type check |
+| Worker | `cd worker && pytest` | Scorer parity, matcher, streams, Swadharma (SAV 337, D9/D10, sub-lords, dashas, unknown time, banned words, junior windows), reports (disclaimer, no Swadharma or private notes outside case_file, 8-page junior, PDF render), scheduler, and an end-to-end pipeline on an in-memory database |
 
-Creates `swadharmapath_test`, loads a Supabase stub (auth/storage/vault shims), applies the migration, loads fixtures, runs `rls_test.sql` as the `authenticator` role and `owner_test.sql` as owner. Any change to policies, triggers or RPCs needs a matching test.
-
-Regenerating seed data:
-
-```bash
-python3 supabase/seed/build_seed.py   # rewrites everything after "-- BEGIN GENERATED SEED"
-```
+Any change to policies, triggers or RPCs needs a matching SQL test. Regenerate seed data with `python3 supabase/seed/build_seed.py` (rewrites everything after `-- BEGIN GENERATED SEED`); regenerate scorer fixtures with `python3 supabase/seed/build_scoring_fixtures.py` then `UPDATE_FIXTURES=1 npx vitest run supabase/functions`.
 
 ## 12. Change history
 
 | Version | Date | Change |
 |---|---|---|
 | 1.0 | 2026-10-24 | Baseline from `001_init.sql` and the engine-rule spec |
+| 1.1 | 2026-10-24 | Start Here code landed: Edge Functions, web app, worker. Engine sections now describe the implemented formulas; `next_item` has no expiry grace; report storage path; worker and demo-mode configuration; test suites |

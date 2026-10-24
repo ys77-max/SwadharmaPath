@@ -12,7 +12,7 @@ The progress bar at the top of **/me** shows where you are.
 |---|---|
 | Onboard → Assess → Sessions → Options → Roadmap | Onboard → Discover → Talk → Streams → Explore Plan |
 
-Early Explorer screens use bigger text and friendlier language, and help you choose a **stream** for Class 11–12 rather than a single career.
+Early Explorer screens use bigger text, friendlier language and pictures, and help you choose a **stream** for Class 11–12 rather than a single career.
 
 ## 2. Signing in
 
@@ -39,7 +39,7 @@ Your counsellor or the agency usually creates your account after your enquiry. I
 
 The list shows each assessment, its status (not started, in progress, completed) and an estimated time.
 
-- One question is shown per screen, with a progress bar.
+- One question is shown per screen, with a progress bar. You can answer with the mouse or the keyboard (number keys pick an option, Enter moves on). Work-style questions ask you to pick the statement **most** like you and the one **least** like you.
 - Your answers **save automatically** every 30 seconds and when you move on. You can close the browser and come back; press **Resume** to continue where you left off.
 - Some sections are **timed**. The timer starts when you see the first question of the section and keeps running even if you leave. In a timed section you **cannot go back** to earlier questions. When time runs out, you move to the next section.
 - Answer honestly and at your natural pace. Answering very fast or picking the same option repeatedly is flagged to your counsellor and may mean the test is repeated.

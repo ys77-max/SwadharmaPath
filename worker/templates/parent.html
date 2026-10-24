@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% import "_macros.html" as m with context %}
+{% block body %}
+{{ m.cover("Parent summary", "A two-page overview of " ~ candidate.full_name ~ "'s profile and next steps.") }}
+<div class="grid2">
+  <div class="box"><b>Interests</b><br>{% for i in interest[:3] %}{{ i.label }}{% if not loop.last %}, {% endif %}{% else %}<span class="muted">pending</span>{% endfor %}</div>
+  <div class="box"><b>Thinking strengths</b><br>{% for a in aptitude|sort(attribute="pct", reverse=True) %}{% if loop.index <= 2 %}{{ a.label }} ({{ a.band }}){% if loop.index < 2 and not loop.last %}, {% endif %}{% endif %}{% else %}<span class="muted">pending</span>{% endfor %}</div>
+  <div class="box"><b>Work style</b><br>{{ workstyle.primary_label or "pending" }}</div>
+</div>
+{% if values_top5 %}<p><b>What matters most to {{ candidate.full_name }}:</b> {{ values_top5|join(", ") }}</p>{% endif %}
+{% if narrative.summary %}<h2>Counsellor's summary</h2><p>{{ narrative.summary }}</p>{% endif %}
+<h2>{% if junior %}Stream options{% else %}Options to explore together{% endif %}</h2>
+{% if junior %}{{ m.stream_list(streams[:3]) }}{% else %}{{ m.career_list(careers[:5], False) }}{% endif %}
+<h2 class="page-break">Key dates</h2>
+{% if roadmap %}<table><tr><th>When</th><th>What</th><th>Who</th></tr>
+{% for i in roadmap_items %}{% if i.kind in ("exam", "milestone") or i.owner == "parent" %}<tr><td style="width:20%">{{ i.due_date|d }}</td><td>{{ i.title }}</td><td>{{ i.owner }}</td></tr>{% endif %}{% endfor %}</table>
+{% else %}<p class="muted">Dates will be added after the planning session.</p>{% endif %}
+<h2>How you can help</h2>
+<ul>
+  <li>Ask open questions about what {{ candidate.full_name }} enjoys, and listen before advising.</li>
+  <li>Treat these results as a starting point for conversation, not a verdict.</li>
+  <li>Support exposure: a visit, a conversation with a professional, a short course.</li>
+  <li>Keep the roadmap dates visible at home and check in gently each month.</li>
+</ul>
+{% if counsellor.full_name %}<p>Questions? Contact {{ counsellor.full_name }}{% if counsellor.email %} at {{ counsellor.email }}{% endif %}.</p>{% endif %}
+<p class="muted">{{ disclaimer }}</p>
+{% endblock %}
