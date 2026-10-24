@@ -10,6 +10,15 @@ Go to **/login** and use your email and password or your phone number and one-ti
 
 ## 2. Giving consent for a child under 18
 
+```mermaid
+flowchart LR
+  A[Child's account<br/>created] --> B{Under 18 or<br/>no date of birth?}
+  B -- No --> R[Assessments open]
+  B -- Yes --> P[Parent opens /family<br/>presses Give consent]
+  P --> L[Consent time<br/>recorded and audited]
+  L --> R
+```
+
 Children under 18 cannot start any assessment until you give consent.
 
 1. Open **/family** and select your child.
@@ -27,6 +36,21 @@ You or your child may submit birth details for the Swadharma (Vedic astrology) l
 - You see a Swadharma Report only if the counsellor deliberately releases it to you. That release is logged.
 
 ## 4. What you can see on /family
+
+```mermaid
+flowchart TB
+  subgraph Visible["You can see"]
+    v1[Progress and next session]
+    v2[Approved results and profile]
+    v3[Published options and roadmap]
+    v4[Released reports]
+  end
+  subgraph Hidden["Never shown to families"]
+    h1[Counsellor private notes]
+    h2[Birth details]
+    h3[Swadharma analysis<br/>unless a report is released]
+  end
+```
 
 | Section | What it shows |
 |---|---|

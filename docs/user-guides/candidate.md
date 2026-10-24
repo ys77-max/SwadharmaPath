@@ -6,6 +6,18 @@ For students (Class 8 to postgraduate) and working professionals using Swadharma
 
 ## 1. Your journey at a glance
 
+```mermaid
+flowchart LR
+  subgraph ST["Class 11 onwards and professionals"]
+    direction LR
+    a1([Onboard]) --> a2([Assess]) --> a3([Sessions]) --> a4([Options]) --> a5([Roadmap])
+  end
+  subgraph EE["Class 8–10 · Early Explorer"]
+    direction LR
+    b1([Onboard]) --> b2([Discover]) --> b3([Talk]) --> b4([Streams]) --> b5([Explore Plan])
+  end
+```
+
 The progress bar at the top of **/me** shows where you are.
 
 | Class 11–12, college and professionals | Class 8–10 (Early Explorer) |
@@ -37,6 +49,15 @@ Your counsellor or the agency usually creates your account after your enquiry. I
 
 ## 4. Taking assessments (/me/assess)
 
+```mermaid
+flowchart LR
+  S([Start or Resume]) --> Q[One question<br/>per screen] --> SV[Answer saves<br/>automatically] --> T{Timed<br/>section?}
+  T -- No --> N[You may go back<br/>and change answers]
+  T -- Yes --> C[Clock keeps running<br/>no going back<br/>moves on when time is up]
+  N --> D([Submit at the end])
+  C --> D
+```
+
 The list shows each assessment, its status (not started, in progress, completed) and an estimated time.
 
 - One question is shown per screen, with a progress bar.
@@ -47,6 +68,13 @@ The list shows each assessment, its status (not started, in progress, completed)
 Tips: use a stable internet connection, a quiet place, and set aside the estimated time for timed tests.
 
 ## 5. Your profile (/me/profile)
+
+```mermaid
+flowchart LR
+  A[You finish<br/>assessments] --> B[Results scored<br/>automatically] --> C{Counsellor<br/>approves?}
+  C -- Not yet --> W[Profile page<br/>stays empty]
+  C -- Yes --> V[You and your parent<br/>see results]
+```
 
 Your results appear **after your counsellor has reviewed and approved them**. You will see:
 

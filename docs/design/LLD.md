@@ -124,6 +124,32 @@ C = candidate (own), P = parent (linked), Co = assigned counsellor, A = admin, S
 
 ## 5. Triggers
 
+```mermaid
+stateDiagram-v2
+  direction LR
+  state "assessment_sessions.status" as AS {
+    [*] --> in_progress: INSERT (under-18 gate)
+    in_progress --> completed: complete_assessment()
+    in_progress --> invalidated: counsellor re-administers
+    completed --> invalidated: counsellor re-administers
+  }
+  completed --> scoring: trigger → pg_net → score_instrument
+```
+
+```mermaid
+stateDiagram-v2
+  direction LR
+  state "roadmap_items.status" as RI {
+    [*] --> todo
+    todo --> in_progress: candidate
+    in_progress --> done: candidate (completed_at set)
+    todo --> done: candidate
+    todo --> missed: nightly job, past due
+    in_progress --> missed: nightly job, past due
+    missed --> in_progress: counsellor reopens
+  }
+```
+
 | Trigger | Table / event | Behaviour | Error code |
 |---|---|---|---|
 | `on_auth_user_created` | auth.users AFTER INSERT | Creates `public.users`; role from metadata limited to candidate/parent; `full_name` from metadata or email/phone prefix | — |
@@ -143,6 +169,22 @@ C = candidate (own), P = parent (linked), Co = assigned counsellor, A = admin, S
 | `swadharma_release_after` | swadharma_releases AFTER INSERT | Widens `reports.visible_to` (both → all; candidate + parent over time → all); writes `audit_log` `swadharma_release` with before/after | — |
 
 ### 5.1 Scheduled SQL
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Co as Counsellor
+  participant R as reports
+  participant SR as swadharma_releases
+  participant A as audit_log
+  Co->>R: INSERT kind=swadharma (visible_to forced to counsellor, version+1)
+  Note over R: worker renders PDF and fills pdf_path once
+  Co->>SR: INSERT released_to + reason
+  SR->>SR: BEFORE: report is this candidate's swadharma, consent exists
+  SR->>R: AFTER: widen visible_to (candidate · parent · all)
+  SR->>A: AFTER: audit swadharma_release (before/after)
+  Note over SR,A: UPDATE / DELETE / TRUNCATE denied for every role
+```
 
 `private.mark_missed_roadmap_items()` via `pg_cron` job `swadharmapath-missed-items` at `30 20 * * *` UTC (02:00 IST): published roadmaps' items with `due_date < today` and status todo/in_progress → `missed`; inserts one `roadmap_missed` notification per owner (candidate or parent) and the counsellor. Returns the count.
 
@@ -198,6 +240,16 @@ Validity flags: median response time < 1.5 s; straight-lining ≥ 10 consecutive
 
 ### 9.2 Career matching (`worker/match.py`) — student, professional
 
+```mermaid
+pie showData title Career fit score (100 points)
+  "Interest" : 35
+  "Aptitude" : 25
+  "Work-style" : 15
+  "Values" : 10
+  "Outlook" : 10
+  "Constraints" : 5
+```
+
 ```
 fit = 35·cosine(interest_vector, career.interest_weights)
     + 25·aptitude_fit + 15·workstyle_fit + 10·values_fit
@@ -212,6 +264,15 @@ Top 15 → `career_matches` with `breakdown {interest, aptitude, workstyle, valu
 
 ### 9.3 Stream recommendation (`worker/streams.py`) — early_explorer
 
+```mermaid
+pie showData title Stream fit score (100 points)
+  "Interest alignment" : 35
+  "Aptitude" : 30
+  "Academics and enjoyment" : 20
+  "Breadth" : 10
+  "Board availability" : 5
+```
+
 ```
 stream_fit = 35·interest alignment (RIASEC vector vs families the stream keeps open)
            + 30·aptitude fit   (PCM numerical+abstract; PCB verbal+abstract;
@@ -225,6 +286,16 @@ stream_fit = 35·interest alignment (RIASEC vector vs families the stream keeps 
 Always include the widest "keep options open" combination; output keeps_open/closes and 3 sample careers per open family; never a single career.
 
 ### 9.4 Swadharma (`worker/swadharma.py`)
+
+```mermaid
+pie showData title Swadharma points per family (max 100)
+  "D10" : 25
+  "KP 10th sub-lord" : 20
+  "Ashtakavarga" : 20
+  "Planetary strength" : 15
+  "Yogas" : 10
+  "Dasha timing" : 10
+```
 
 Runs only if `swadharma_opted_in` and `birth_details.consent_at`. Swiss Ephemeris, Lahiri; Placidus cusps for KP; whole-sign for Parashari. `time_certainty = unknown` → Moon-sign and dignity components only, confidence low.
 
@@ -283,3 +354,4 @@ python3 supabase/seed/build_seed.py   # rewrites everything after "-- BEGIN GENE
 | Version | Date | Change |
 |---|---|---|
 | 1.0 | 2026-10-24 | Baseline from `001_init.sql` and the engine-rule spec |
+| 1.1 | 2026-10-24 | Added state, sequence and score-weight diagrams; Word version |

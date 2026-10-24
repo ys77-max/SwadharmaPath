@@ -6,6 +6,14 @@ For agency administrators. Your home page is **/admin**. Navigation: Dashboard |
 
 ## 1. Dashboard (/admin)
 
+```mermaid
+flowchart LR
+  L[Leads] --> F[Funnel<br/>v_funnel]
+  S[Sessions] --> U[Utilisation<br/>v_counsellor_utilisation]
+  A[Assessments + reports] --> T[Turnaround<br/>v_tat]
+  O[Outcomes 6/12/24 m] --> OC[Outcomes<br/>v_outcomes]
+```
+
 | Widget | Source | Meaning |
 |---|---|---|
 | Funnel | `v_funnel` | Leads by stage and track, total and last 30 days |
@@ -16,6 +24,22 @@ For agency administrators. Your home page is **/admin**. Navigation: Dashboard |
 | Outcomes | `v_outcomes` | Per 6/12/24-month checkpoint: count, % in top 5, average satisfaction |
 
 ## 2. Leads (/admin/leads)
+
+```mermaid
+stateDiagram-v2
+  direction LR
+  [*] --> new
+  new --> contacted
+  contacted --> discovery
+  discovery --> paid
+  paid --> active: convert to candidate
+  active --> completed
+  new --> lost
+  contacted --> lost
+  discovery --> lost
+  completed --> [*]
+  lost --> [*]
+```
 
 Pipeline board with stages **new → contacted → discovery → paid → active → completed** (or **lost**).
 

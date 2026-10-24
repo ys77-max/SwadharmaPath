@@ -21,7 +21,7 @@ SwadharmaPath has three runtime parts around one Supabase project:
 3. **Worker** — a Python 3.12 package in `/worker` (pandas, numpy, pyswisseph, WeasyPrint, supabase-py, APScheduler) running on Railway with the service-role key. It does all scoring, matching, Swadharma computation, PDF reports and scheduled jobs.
 
 ```mermaid
-flowchart TB
+flowchart LR
   subgraph Client["Browser (Vercel-hosted SPA)"]
     UI[React app<br/>/me /family /cases /admin]
   end
@@ -120,7 +120,7 @@ sequenceDiagram
   UI->>DB: INSERT leads (anon)
   DB->>DB: leads_rate_limit trigger (validate, throttle, stage=new)
   A->>DB: assign counsellor, set next_followup, move stage
-  A->>DB: create candidate (lead_id, counsellor_id); converted_candidate set
+  A->>DB: create candidate (lead_id, counsellor_id) and set converted_candidate
 ```
 
 ### 4.2 Assessment and scoring
@@ -162,6 +162,27 @@ sequenceDiagram
 
 ## 5. Security architecture
 
+```mermaid
+flowchart TB
+  U[Browser · anon key + user JWT] --> L1
+  subgraph L1["Layer 1 · Authentication"]
+    a[Supabase Auth · role in users.role · role changes admin-only]
+  end
+  L1 --> L2
+  subgraph L2["Layer 2 · Row-level security on every table"]
+    b[private helpers: can_manage · is_family · is_admin]
+  end
+  L2 --> L3
+  subgraph L3["Layer 3 · Views, column grants, RPCs"]
+    c[v_candidate_* strip swadharma and private notes · items served one at a time]
+  end
+  L3 --> L4
+  subgraph L4["Layer 4 · Triggers"]
+    d[under-18 gate · append-only · write-once reports · release audit]
+  end
+  L4 --> DB[(Data)]
+```
+
 | Concern | Control |
 |---|---|
 | Authentication | Supabase Auth (email/password, phone OTP). New auth users get a `public.users` row by trigger; self-signup role is limited to candidate or parent. |
@@ -191,27 +212,46 @@ Environments: local (Supabase CLI or plain Postgres for SQL tests) → staging S
 Core entities and ownership (full column list in the [LLD](LLD.md#3-data-model)):
 
 ```mermaid
-erDiagram
-  users ||--o{ candidates : "user / parent / counsellor"
-  leads ||--o| candidates : converts
-  candidates ||--o| birth_details : "🔒"
-  candidates ||--o{ assessment_sessions : takes
-  instruments ||--o{ assessment_sessions : uses
-  candidates ||--o{ assessment_results : has
-  candidates ||--o| profile_summary : has
-  candidates ||--o{ career_matches : gets
-  careers ||--o{ career_matches : ""
-  careers ||--o{ education_pathways : has
-  candidates ||--o{ stream_matches : gets
-  stream_options ||--o{ stream_matches : ""
-  candidates ||--o| swadharma_charts : "🔒"
-  candidates ||--o{ swadharma_scores : "🔒"
-  candidates ||--o{ sessions : attends
-  candidates ||--o{ roadmaps : follows
-  roadmaps ||--o{ roadmap_items : contains
-  candidates ||--o{ reports : receives
-  reports ||--o{ swadharma_releases : "released by"
-  candidates ||--o{ outcomes : tracked
+flowchart LR
+  subgraph Intake["People and intake"]
+    direction TB
+    users[users<br/>candidate · parent · counsellor · admin]
+    leads[leads]
+  end
+  C((candidates))
+  subgraph Assess["Assessment"]
+    direction TB
+    instruments --> assessment_sessions --> assessment_results --> profile_summary
+    subject_enjoyment
+  end
+  subgraph Match["Options"]
+    direction TB
+    careers --> education_pathways
+    careers --> career_matches
+    stream_options --> stream_matches
+  end
+  subgraph Swa["Swadharma 🔒 counsellor and admin only"]
+    direction TB
+    birth_details --> swadharma_charts --> swadharma_scores
+  end
+  subgraph Plan["Counselling and plan"]
+    direction TB
+    sessions
+    roadmaps --> roadmap_items
+    outcomes
+  end
+  subgraph Rep["Reports and audit"]
+    direction TB
+    reports --> swadharma_releases
+    audit_log
+    notifications
+  end
+  Intake --> C
+  C --> Assess
+  C --> Match
+  C --> Swa
+  C --> Plan
+  C --> Rep
 ```
 
 ## 8. Quality attributes and testing
@@ -238,3 +278,4 @@ erDiagram
 | Version | Date | Change |
 |---|---|---|
 | 1.0 | 2026-10-24 | Baseline from spec and `feat/start-here` database migration |
+| 1.1 | 2026-10-24 | Added security-layer and data-group diagrams; fixed lead-flow diagram; Word version |

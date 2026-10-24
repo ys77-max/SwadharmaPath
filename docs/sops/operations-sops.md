@@ -25,6 +25,16 @@ Standard operating procedures for counsellors and admins. Each SOP lists who doe
 
 ## SOP-O1 Lead intake and follow-up
 
+```mermaid
+flowchart LR
+  N[New lead] -->|within 1 working day| AS[Admin assigns counsellor<br/>and follow-up date]
+  AS --> CT[Counsellor contacts<br/>stage: contacted]
+  CT --> DC[Discovery call<br/>stage: discovery]
+  DC --> PD{Paid?}
+  PD -- Yes --> PA[stage: paid → SOP-O2]
+  PD -- "No after 3 attempts" --> LO[stage: lost + note]
+```
+
 **Trigger:** a new lead appears (web form, WhatsApp, referral, school, walk-in).
 
 1. Within 1 working day, admin opens **/admin/leads**, assigns a counsellor and sets **next follow-up**.
@@ -76,6 +86,18 @@ Standard operating procedures for counsellors and admins. Each SOP lists who doe
 
 ## SOP-O6 Releasing a Swadharma report
 
+```mermaid
+flowchart TD
+  A{Candidate opted in<br/>with consent?} -- No --> X[Stop: cannot release]
+  A -- Yes --> B{Family asked or<br/>agreed in session?}
+  B -- No --> Y[Do not release<br/>keep as counsellor lens]
+  B -- Yes --> C[Review tab and<br/>add counsellor notes]
+  C --> D[Generate swadharma report<br/>check disclaimer on page 1]
+  D --> E[Release: choose candidate,<br/>parent or both + reason]
+  E --> F[Permanent · audited<br/>visible to chosen people]
+  F --> G[Walk family through it<br/>in a session]
+```
+
 Only if the candidate (and guardian for minors) opted in, and the family has asked for it or agreed in a session.
 
 1. Review the Swadharma tab: confidence, agreement matrix, favourable windows. Add counsellor notes.
@@ -99,6 +121,11 @@ Only if the candidate (and guardian for minors) opted in, and the family has ask
 **Record:** `sessions` row with `iccc_stage`, `attended`, summary.
 
 ## SOP-O8 Reports and SLA
+
+```mermaid
+flowchart LR
+  D0([Day 0<br/>last assessment<br/>completed]) --> D2[Day 1–2<br/>review results<br/>approve profile] --> D4[Day 3–4<br/>curate and<br/>publish options] --> D6[Day 5–6<br/>generate and<br/>check report] --> D7([Day 7<br/>report due])
+```
 
 1. The report SLA is **7 days** from the last completed assessment.
 2. Check **/reports/queue** daily. Work the oldest due first.

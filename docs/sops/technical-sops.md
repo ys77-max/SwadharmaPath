@@ -14,10 +14,25 @@ Procedures for developers and the technical owner.
 | T6 | [Backup and restore](#sop-t6-backup-and-restore) |
 | T7 | [Incident response](#sop-t7-incident-response) |
 | T8 | [Documentation maintenance](#sop-t8-documentation-maintenance) |
+| T9 | [Word (.docx) versions of the docs](#sop-t9-word-docx-versions-of-the-docs) |
 
 ---
 
 ## SOP-T1 Release and deployment
+
+```mermaid
+flowchart LR
+  B[Branch] --> PR[Pull request<br/>code + docs]
+  PR --> CI{CI green?<br/>docs check · tests}
+  CI -- No --> FX[Fix] --> PR
+  CI -- Yes --> ST[Staging<br/>migrations first]
+  ST --> MG[Merge to main]
+  MG --> V[Vercel web]
+  MG --> R[Railway worker]
+  MG --> W[Word docs rebuilt]
+  V --> SM[Smoke test as each role]
+  R --> SM
+```
 
 1. Every change goes through a pull request to `main`.
 2. CI must be green, including the **docs check** (code changes need matching `/docs` changes).
@@ -70,6 +85,17 @@ Never put the service-role key in a `VITE_*` variable or in the repo.
 
 ## SOP-T7 Incident response
 
+```mermaid
+flowchart TD
+  I[Incident reported] --> Q{Family data exposed?<br/>Swadharma, notes, leak}
+  Q -- Yes --> S1[S1: contain now<br/>notify owner · SOP-O14]
+  Q -- No --> Q2{Login, tests or<br/>scoring down?}
+  Q2 -- Yes --> S2[S2: fix within 1 hour<br/>roll back if needed]
+  Q2 -- No --> S3[S3: next working day]
+  S1 --> PM[Post-incident note<br/>+ test + doc update]
+  S2 --> PM
+```
+
 | Severity | Example | Response |
 |---|---|---|
 | S1 | Swadharma or private notes visible to a family; data leak | Immediately: disable affected route or policy, notify owner, follow [SOP-O14](operations-sops.md#sop-o14-privacy-requests-and-data-incidents) |
@@ -87,3 +113,30 @@ After any S1/S2: short post-incident note, a test that would have caught it, and
 3. Tick the docs box in the PR template.
 4. CI runs `scripts/check_docs.py`. It fails when code changes have no `/docs` change, or when a mapped area (for example `supabase/migrations/`) changes without its mapped doc.
 5. For a change with genuinely no doc impact (formatting, dependency bump), add the label `docs-not-required` and say why in the PR description. Reviewers must agree.
+
+## SOP-T9 Word (.docx) versions of the docs
+
+The Markdown files in `/docs` are the master copy. Branded Word versions live in `docs/word/` and are **generated, never edited by hand**.
+
+```mermaid
+flowchart LR
+  MD[Edit Markdown in /docs<br/>incl. mermaid diagrams] --> PR[Pull request<br/>docs check passes]
+  PR --> M[Merge to main]
+  M --> GH[GitHub Action<br/>Build Word docs]
+  GH --> R[Diagrams rendered to images<br/>pandoc + branded styles]
+  R --> W[docs/word/*.docx committed<br/>+ downloadable artifact]
+```
+
+1. Edit the Markdown. Draw diagrams as ```` ```mermaid ```` blocks; they render on GitHub and become images in Word. Prefer `flowchart LR` with `direction TB` subgraphs so diagrams stay readable on an A4 page, and avoid `;` inside labels.
+2. After merge to `main`, the **Build Word docs** workflow (`.github/workflows/docs-word.yml`) runs `scripts/docx/build_docx.py` and commits the updated `.docx` files. It can also be run by hand from the Actions tab (*Run workflow*).
+3. To build locally (needs pandoc, Node 22, python-docx):
+   ```bash
+   npm ci --prefix scripts/docx
+   npx --prefix scripts/docx playwright install chromium
+   python3 scripts/docx/build_docx.py                     # all documents
+   python3 scripts/docx/build_docx.py SwadharmaPath-BRD   # one document
+   ```
+4. To add a new document, add a row to `DOCS_TO_BUILD` in `scripts/docx/build_docx.py` and to the table in `docs/README.md`.
+
+Each Word file has a cover page, a clickable contents list, page headers and numbers, teal header rows on tables and all diagrams as images.
+

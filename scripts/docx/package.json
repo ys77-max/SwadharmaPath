@@ -1,0 +1,9 @@
+{
+  "name": "swadharmapath-docx-build",
+  "private": true,
+  "description": "Builds the Word (.docx) versions of /docs. See docs/sops/technical-sops.md (SOP-T9).",
+  "dependencies": {
+    "mermaid": "11.4.1",
+    "playwright": "1.49.1"
+  }
+}

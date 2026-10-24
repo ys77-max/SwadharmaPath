@@ -6,6 +6,18 @@ Find your problem, try the fix, and contact your counsellor (families) or the te
 
 ## For candidates and parents
 
+```mermaid
+flowchart TD
+  Q{What can't you see?} --> R[Results or profile]
+  Q --> O[Options or streams]
+  Q --> RP[A report]
+  Q --> RM[Roadmap]
+  R --> R1[Waiting for counsellor approval · T-3]
+  O --> O1[Waiting for counsellor to publish · T-4]
+  RP --> RP1[Not released to you yet · T-9<br/>or link expired · T-8]
+  RM --> RM1[Roadmap not published yet<br/>ask your counsellor]
+```
+
 ### T-1 I cannot log in
 - **Email login:** check spelling; use "Forgot password" to reset.
 - **Phone OTP:** enter the number with country code (+91). Codes expire after a few minutes; request a new one. Check SMS is not blocked.
@@ -97,6 +109,9 @@ Expected on plain Postgres; the migration skips them. On Supabase, enable both e
 
 ### T-42 CI "docs check" failed
 Your PR changes code without changing `/docs`, or changes a mapped area without its mapped doc. Update the docs listed in the failure message. See [SOP-T8](../sops/technical-sops.md#sop-t8-documentation-maintenance).
+
+### T-43 Word (.docx) files are out of date or the "Build Word docs" job failed
+The Word files rebuild only after a merge to `main`. Open the Actions tab and check **Build Word docs**. A Mermaid syntax error names the diagram that failed; a `;` inside a label is the usual cause. Fix the Markdown and merge again, or run the workflow by hand. See [SOP-T9](../sops/technical-sops.md#sop-t9-word-docx-versions-of-the-docs).
 
 ## Error code reference
 

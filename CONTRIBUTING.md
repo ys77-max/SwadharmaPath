@@ -11,6 +11,7 @@ Any change to code or specs must update the matching documentation in [`/docs`](
   ```bash
   python3 scripts/check_docs.py origin/main
   ```
+- Word versions in `docs/word/` are generated from the Markdown after merge; never edit a `.docx` by hand.
 - Only for changes with genuinely no doc impact (formatting, dependency bumps), add the `docs-not-required` label and explain why in the PR description.
 
 ## Database changes

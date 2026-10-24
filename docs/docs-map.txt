@@ -8,5 +8,6 @@ supabase/seed/**       | docs/design/LLD.md
 supabase/functions/**  | docs/design/LLD.md, docs/design/HLD.md
 worker/**              | docs/design/LLD.md
 src/**                 | docs/user-guides/candidate.md, docs/user-guides/parent.md, docs/user-guides/counsellor.md, docs/user-guides/admin.md, docs/troubleshooting/troubleshooting.md, docs/design/LLD.md
+scripts/**             | docs/sops/technical-sops.md
 .github/workflows/**   | docs/sops/technical-sops.md, docs/design/HLD.md
 vite.config.ts         | docs/design/HLD.md, docs/design/LLD.md

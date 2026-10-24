@@ -6,6 +6,11 @@ For agency counsellors. Your home page is **/cases**. Navigation: Cases | Schedu
 
 ## 1. Caseload (/cases)
 
+```mermaid
+flowchart LR
+  ks([know_self]) --> kw([know_world]) --> de([decide]) --> pl([plan]) --> ac([act]) --> rv([review])
+```
+
 The table lists every candidate assigned to you:
 
 | Column | Meaning |
@@ -19,6 +24,26 @@ The table lists every candidate assigned to you:
 You only see candidates where you are the assigned counsellor.
 
 ## 2. Case workspace (/cases/:id)
+
+```mermaid
+flowchart LR
+  subgraph P1["1 · Understand"]
+    direction TB
+    A[Assessments complete] --> B{Validity<br/>flags OK?}
+    B -- No --> RA[Re-administer]
+    B -- Yes --> C[Edit narrative<br/>Approve profile]
+  end
+  subgraph P2["2 · Decide"]
+    direction TB
+    D[Curate options<br/>pin · hide · add] --> E[Publish to candidate] --> F[Sessions by<br/>ICCC stage]
+  end
+  subgraph P3["3 · Plan and report"]
+    direction TB
+    G[Roadmap<br/>template → publish] --> H[Generate reports] --> I{Swadharma report<br/>consented and asked?}
+    I -- Yes --> J[Release with reason<br/>permanent · audited]
+  end
+  P1 --> P2 --> P3
+```
 
 Tabs: **Overview | Assessments | Profile | Swadharma 🔒 | Options | Sessions | Roadmap | Reports | Documents**
 

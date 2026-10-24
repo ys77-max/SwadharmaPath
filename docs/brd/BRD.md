@@ -87,17 +87,27 @@ The `early_explorer` experience uses larger type, illustrations, friendlier copy
 
 ```mermaid
 flowchart LR
-  A[Enquiry /enquire] --> B[Lead pipeline<br/>new → contacted → discovery → paid]
-  B --> C[Candidate account + onboarding<br/>disclaimer, guardian consent, optional Swadharma consent]
-  C --> D[Psychometric battery<br/>test runner]
-  D --> E[Scoring worker<br/>results + validity flags]
-  E --> F[Counsellor review<br/>approve profile]
-  F --> G[Matching<br/>careers or streams]
-  G --> H[Counsellor curation<br/>pin / hide / add → publish]
-  H --> I[Sessions<br/>ICCC stages]
-  I --> J[Roadmap<br/>template → publish]
-  J --> K[Reports<br/>PDF via worker]
-  K --> L[Follow-up<br/>nudges, outcomes 6/12/24 m]
+  subgraph S1["1 · Attract"]
+    direction TB
+    A[Enquiry on /enquire] --> B[Lead pipeline<br/>new → contacted → discovery → paid]
+  end
+  subgraph S2["2 · Understand"]
+    direction TB
+    C[Account + onboarding<br/>disclaimer · guardian consent · optional Swadharma consent] --> D[Psychometric battery<br/>test runner]
+    D --> E[Scoring worker<br/>results + validity flags]
+    E --> F[Counsellor review<br/>approve profile]
+  end
+  subgraph S3["3 · Decide"]
+    direction TB
+    G[Matching<br/>careers or streams] --> H[Counsellor curation<br/>pin · hide · add → publish]
+    H --> I[Sessions<br/>ICCC stages]
+  end
+  subgraph S4["4 · Act and follow up"]
+    direction TB
+    J[Roadmap<br/>template → publish] --> K[Reports<br/>branded PDFs]
+    K --> L[Follow-up<br/>nudges · outcomes at 6/12/24 months]
+  end
+  S1 --> S2 --> S3 --> S4
 ```
 
 ICCC counselling stages used on cases and sessions: `know_self → know_world → decide → plan → act → review`.
@@ -220,6 +230,32 @@ IDs are stable; reference them in pull requests and tests.
 
 ## 9. Business rules
 
+```mermaid
+flowchart LR
+  subgraph Counsellor["Counsellor and admin only"]
+    SW[Swadharma charts and points]
+    BD[Birth details]
+    PN[Private session notes]
+    CF[Case file report]
+  end
+  subgraph Gates["Gates controlled by the counsellor"]
+    G1{Approve profile}
+    G2{Publish options}
+    G3{Publish roadmap}
+    G4{Release Swadharma report<br/>reason required · permanent}
+  end
+  subgraph Family["Candidate and parent"]
+    R[Results and profile]
+    O[Options or streams]
+    RM[Roadmap]
+    SR[Swadharma report]
+  end
+  G1 --> R
+  G2 --> O
+  G3 --> RM
+  SW --> G4 --> SR
+```
+
 | ID | Rule |
 |---|---|
 | BR-1 | A candidate never sees psychometric results or profile until a counsellor approves the profile. |
@@ -295,3 +331,4 @@ All P1 items in Section 4.1 are demonstrable end to end with seed data, and:
 | Version | Date | Change |
 |---|---|---|
 | 1.0 | 2026-10-24 | Baseline from the PRD-derived build specification |
+| 1.1 | 2026-10-24 | Added business-process and visibility-gate diagrams; Word version |

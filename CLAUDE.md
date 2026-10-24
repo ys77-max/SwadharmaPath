@@ -11,6 +11,8 @@ For every code or spec change, update the matching documents under `docs/` in th
 - `docs/sops/*.md` — operational and technical procedures
 - `docs/troubleshooting/troubleshooting.md` — new or changed errors and behaviour
 
+Draw diagrams as Mermaid blocks in the Markdown. Never edit `docs/word/*.docx` by hand; they are rebuilt from the Markdown on merge (`scripts/docx/build_docx.py`).
+
 Use `docs/docs-map.txt` to see which docs a path maps to, add a Change history row when behaviour changes, and run `python3 scripts/check_docs.py origin/main` before pushing.
 
 ## Non-negotiables

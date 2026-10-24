@@ -1,0 +1,54 @@
+name: Build Word docs
+
+# Rebuilds docs/word/*.docx from the Markdown in /docs whenever docs change on main,
+# so the Word versions never drift from the source. See docs/sops/technical-sops.md (SOP-T9).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**/*.md"
+      - "scripts/docx/**"
+      - ".github/workflows/docs-word.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: docs-word
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install tools
+        run: |
+          sudo apt-get update && sudo apt-get install -y pandoc
+          pip install python-docx==1.1.2
+          npm ci --prefix scripts/docx
+          npx --prefix scripts/docx playwright install --with-deps chromium
+      - name: Build .docx files
+        run: python3 scripts/docx/build_docx.py
+      - name: Commit updated Word docs
+        run: |
+          git add docs/word
+          if git diff --cached --quiet; then
+            echo "Word docs unchanged"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "docs: rebuild Word versions from Markdown"
+          git push
+      - uses: actions/upload-artifact@v4
+        with:
+          name: swadharmapath-word-docs
+          path: docs/word/*.docx
