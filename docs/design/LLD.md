@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Document | LLD |
-| Version | 1.1 |
+| Version | 1.2 |
 | Last updated | 2026-10-24 |
 | Code baseline | `feat/start-here`: migration, Edge Functions, web app and worker (Start Here scope). |
 | Related | [BRD](../brd/BRD.md) · [HLD](HLD.md) |
@@ -18,12 +18,13 @@
 |---|---|---|
 | `src/` | React app (Vite + TS, Tailwind v4, shadcn-style components in `src/components/ui`, Recharts). `src/lib/supabase.ts` client; `src/lib/api/` data layer | implemented (Start Here routes) |
 | `supabase/migrations/001_init.sql` | Schema, constraints, helpers, RLS, triggers, views, RPCs, storage, generated seed | implemented |
+| `supabase/migrations/002_library_refresh_archive.sql` | Library refresh tables and RPCs, archiving columns, settings, RPCs and pg_cron job; `v_caseload` and `assessment_gate` replaced to respect archiving | implemented |
 | `supabase/seed/` | `build_seed.py`, `instruments.py`, `library.py` — regenerate the seed block of the migration | implemented |
-| `supabase/tests/` | `run.sh`, stub, fixtures, `rls_test.sql`, `owner_test.sql` | implemented |
+| `supabase/tests/` | `run.sh` (applies every migration in order), stub, fixtures, `rls_test.sql`, `owner_test.sql`, `library_archive_test.sql`, `archive_owner_test.sql` | implemented |
 | `supabase/functions/_shared/` | `scoring.ts` (TS scorer), `scoring_fixtures.json` (shared with the worker), `workstyle_templates.json`, `cors.ts` | implemented |
 | `supabase/functions/score_instrument/` | Edge Function | implemented |
 | `supabase/functions/generate_signed_report_url/` | Edge Function | implemented |
-| `worker/` | `scoring.py`, `match.py`, `streams.py`, `swadharma.py`, `reports.py` + `templates/`, `scheduler.py`, `db.py`, `families.py`, `karakatwa.json`, `data/workstyle_templates.json`, `Dockerfile`, `railway.json`, `tests/` | implemented |
+| `worker/` | `scoring.py`, `match.py`, `streams.py`, `swadharma.py`, `reports.py` + `templates/`, `scheduler.py`, `library_refresh.py`, `db.py`, `families.py`, `karakatwa.json`, `data/workstyle_templates.json`, `Dockerfile`, `railway.json`, `tests/` | implemented |
 | `docs/` | This documentation set | implemented |
 
 ## 2. Configuration
@@ -34,6 +35,7 @@
 | `VITE_SUPABASE_ANON_KEY` | Web (Vercel) | Public anon key (RLS applies) |
 | `VITE_DEMO_MODE` | Web | `true` runs the UI on in-memory demo data (also automatic when the two variables above are missing). Never set in production |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Worker (Railway) | Service-role client in `worker/db.py` |
+| `ANTHROPIC_API_KEY` | Worker (Railway), optional | Claude API key for AI library refresh (`worker/library_refresh.py`). Without it AI runs fail with a clear message and the quarterly job sends a reminder instead; CSV refresh still works |
 | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Edge Functions | Provided by the Supabase runtime |
 | Vault `project_url` | Supabase Vault | Base URL used by `private.invoke_edge_function` |
 | Vault `service_role_key` | Supabase Vault | Bearer for Edge Function calls from triggers |
@@ -48,8 +50,8 @@ All tables are in `public`, have `id uuid default gen_random_uuid()` unless keye
 | Table | Key columns and constraints |
 |---|---|
 | `users` | `id` = `auth.users.id`; `role` ∈ candidate, parent, counsellor, admin; `full_name` not null; `phone`, `email`, `photo_url`, `language_pref` default `en` |
-| `leads` | `source` ∈ web, whatsapp, referral, school, walk_in; `track` ∈ early_explorer, student, professional; `stage` default `new` ∈ new, contacted, discovery, paid, active, completed, lost; `assigned_counsellor` → users; `next_followup` date; `converted_candidate` → candidates |
-| `candidates` | `user_id`, `lead_id`, `parent_user_id`, `counsellor_id`; `track`; `board`, `dob`, `gender`, `city`, `school_or_employer`, `class_or_years_exp`, `stream_or_function`; `academics`, `constraints` jsonb; `status` default `onboarding`; `swadharma_opted_in` bool; `disclaimer_accepted_at`, `guardian_consent_at` |
+| `leads` | `archived_at`, `archived_by` (002); `source` ∈ web, whatsapp, referral, school, walk_in; `track` ∈ early_explorer, student, professional; `stage` default `new` ∈ new, contacted, discovery, paid, active, completed, lost; `assigned_counsellor` → users; `next_followup` date; `converted_candidate` → candidates |
+| `candidates` | `archived_at`, `archived_by` (002); `user_id`, `lead_id`, `parent_user_id`, `counsellor_id`; `track`; `board`, `dob`, `gender`, `city`, `school_or_employer`, `class_or_years_exp`, `stream_or_function`; `academics`, `constraints` jsonb; `status` default `onboarding`; `swadharma_opted_in` bool; `disclaimer_accepted_at`, `guardian_consent_at` |
 | `birth_details` 🔒 | PK `candidate_id`; `birth_date`, `birth_time`, `time_certainty` ∈ exact, approx_15m, approx_1h, unknown; `birth_place`, `lat`, `lng`, `tz`; `consent_given_by`, `consent_at`, `consent_text_version` |
 | `instruments` | `code` ∈ interest, aptitude, workstyle, bigfive, values, learning, school_values, subject_enjoyment; `version`; `track_variant` ∈ junior, standard; `items`, `scoring_spec`, `norms` jsonb (hidden from API roles); `time_limit_min`; `is_active` |
 | `assessment_sessions` | `candidate_id`, `instrument_id`; `started_at`, `completed_at`; `responses` jsonb (`{item_id: {a, rt}, _meta: {section_started: {code: ts}}}`); `status` ∈ in_progress, completed, invalidated; `device`, `duration_sec` |
@@ -58,7 +60,10 @@ All tables are in `public`, have `id uuid default gen_random_uuid()` unless keye
 | `subject_enjoyment` | PK (`candidate_id`, `subject`); `enjoyment` 1–5; `marks_pct`; `teacher_feedback` |
 | `careers` | `name`, `family`, `riasec_code`, `interest_weights` numeric[6], `aptitude_min`, `workstyle_fit`, `values_fit` jsonb; `description`, `day_in_life`; `typical_entry_paths`, `india_salary_band`, `sources` jsonb; `outlook` ∈ growing, stable, transforming, declining; `automation_exposure` ∈ low, medium, high; `adjacent_emerging` text[]; `last_reviewed` |
 | `education_pathways` | `career_id`; `level` ∈ class11_12, ug, pg, diploma, certification, global; `stream_required`, `exams` jsonb, `degrees` text[], `institutions` jsonb, `duration`, `alternative_routes`, `notes` |
-| `stream_options` | `name`, `board`, `subjects` text[], `keeps_open_families`, `closes_families` text[], `notes` |
+| `stream_options` | `name`, `board`, `subjects` text[], `keeps_open_families`, `closes_families` text[], `notes`; `sources` jsonb, `last_reviewed` date (002) |
+| `library_refresh_runs` (002) | `scope` ∈ careers, streams, all; `source` ∈ ai, csv, scheduled; `status` default queued ∈ queued, running, review, applied, failed, cancelled; `requested_by`; `csv_text` (≤ 2 MB, required iff source = csv; csv scope is careers or streams); `summary` jsonb `{checked, proposals, errors[], applied}`; `error`; `created_at`, `started_at`, `finished_at`, `applied_at`, `applied_by`, `rematched_at`. Partial unique index: at most one run in queued/running/review |
+| `library_refresh_proposals` (002) | `run_id` (cascade); `entity` ∈ career, stream; `entity_id` (null = new); `entity_name`; `changes` jsonb object `{field: {old, new}}` (careers may include `pathways`, a full replacement list); `sources` jsonb `[{url, title}]`; `rationale`; `decision` default pending ∈ pending, approved, rejected, skipped; `decided_by`, `decided_at` |
+| `archive_settings` (002) | Single row (`id` boolean = true); `auto_archive` default false; `candidate_inactive_days` default 730, `lead_inactive_days` default 365 (each 30–3650); `last_auto_run_at`; `updated_by`, `updated_at` |
 | `career_matches` | `candidate_id`, `career_id`, `fit_score`, `breakdown` jsonb, `rank`; `counsellor_action` ∈ pinned, hidden, added; `visible_to_candidate` default false; `match_version` |
 | `stream_matches` | as above with `stream_option_id` |
 | `swadharma_charts` 🔒 | PK `candidate_id`; `ayanamsa`, `d1`, `d9`, `d10`, `kp_cusps`, `ashtakavarga`, `dashas` jsonb; `computed_at`, `engine_version`; `insights` jsonb (additive: personality lens, agreement matrix, component detail) |
@@ -109,6 +114,7 @@ C = candidate (own), P = parent (linked), Co = assigned counsellor, A = admin, S
 | profile_summary | read when approved | same | all | all |
 | subject_enjoyment | read; insert own | read | all | all |
 | careers / education_pathways / stream_options | read | read | read | all |
+| library_refresh_runs / proposals, archive_settings | none | none | none | read (writes via RPCs; worker uses the service role) |
 | career_matches / stream_matches | **via `v_candidate_*` only** | same | all | all |
 | sessions | **via `v_candidate_sessions` only** | same | all | all |
 | roadmaps | read when published/completed/paused | same | all | all |
@@ -133,7 +139,7 @@ C = candidate (own), P = parent (linked), Co = assigned counsellor, A = admin, S
 | `on_auth_user_created` | auth.users AFTER INSERT | Creates `public.users`; role from metadata limited to candidate/parent; `full_name` from metadata or email/phone prefix | — |
 | `guard_users` | users BEFORE UPDATE | Only admin/service can change `role` | 42501 |
 | `leads_rate_limit` | leads BEFORE INSERT | Non-staff: name 1–120 chars, notes ≤ 2000, phone or email required; max 3 per contact per hour; max 30 overall per minute; forces `stage = new`, default `source = web` | 22023, P0429 |
-| `assessment_gate` | assessment_sessions BEFORE INSERT | Rejects if `needs_guardian_consent`; defaults `started_at`, `responses` | 42501 |
+| `assessment_gate` | assessment_sessions BEFORE INSERT | Rejects if the candidate is archived (002) or `needs_guardian_consent`; defaults `started_at`, `responses` | 42501 |
 | `assessment_completed` | assessment_sessions AFTER UPDATE OF status → completed | `pg_net` POST to Edge Function `score_instrument` with `{session_id, candidate_id, instrument_id}`; never blocks | — |
 | `profile_touch` | profile_summary BEFORE INSERT/UPDATE | Sets `updated_at` | — |
 | `guard_swadharma_scores` | swadharma_scores BEFORE UPDATE | Non-service may change only `counsellor_notes` | 42501 |
@@ -148,6 +154,8 @@ C = candidate (own), P = parent (linked), Co = assigned counsellor, A = admin, S
 
 ### 5.1 Scheduled SQL
 
+`private.run_auto_archive()` via `pg_cron` job `swadharmapath-auto-archive` at `0 21 * * *` UTC (02:30 IST): when `archive_settings.auto_archive` is on, calls `archive_inactive(today − candidate_inactive_days, today − lead_inactive_days)` and stamps `last_auto_run_at`; otherwise returns null. Audited with `auto: true`.
+
 `private.mark_missed_roadmap_items()` via `pg_cron` job `swadharmapath-missed-items` at `30 20 * * *` UTC (02:00 IST): published roadmaps' items with `due_date < today` and status todo/in_progress → `missed`; inserts one `roadmap_missed` notification per owner (candidate or parent) and the counsellor. Returns the count.
 
 ## 6. Views
@@ -161,7 +169,7 @@ C = candidate (own), P = parent (linked), Co = assigned counsellor, A = admin, S
 | `v_counsellor_utilisation` | invoker | per counsellor: active candidates, sessions and attended minutes in last 30 days |
 | `v_tat` | invoker | last completed assessment → first candidate/candidate_junior/stream_choice report, `tat_days`, `pending` |
 | `v_outcomes` | invoker | per checkpoint: count, % matched top 5, average satisfaction |
-| `v_caseload` | invoker | per candidate: ICCC stage (latest past session, default know_self), next session, assessments done, validity issues, missed items, consent pending, profile approval, `report_due_at` = assessed_at + 7 days |
+| `v_caseload` | invoker | per non-archived candidate (002): ICCC stage (latest past session, default know_self), next session, assessments done, validity issues, missed items, consent pending, profile approval, `report_due_at` = assessed_at + 7 days |
 
 ## 7. RPC contracts (candidate-facing, `SECURITY DEFINER`, granted to `authenticated`)
 
@@ -175,7 +183,20 @@ C = candidate (own), P = parent (linked), Co = assigned counsellor, A = admin, S
 | `give_guardian_consent(candidate_id)` | uuid | timestamptz | Caller must be the linked parent; audit `guardian_consent` |
 | `submit_birth_details(candidate_id, birth_date, birth_time, time_certainty, birth_place, lat, lng, tz, consent_text_version)` | … | void | Caller must be family; consent version required; upsert; sets `swadharma_opted_in`; audit `swadharma_consent`; never returns the row |
 
-Error codes surfaced to the UI: `42501` not permitted, `22023` invalid input/state, `P0429` rate limited.
+### 7.1 Admin RPCs (002, `SECURITY DEFINER`; each checks `private.is_admin()` and raises 42501 otherwise)
+
+| RPC | Input | Output | Rules |
+|---|---|---|---|
+| `request_library_refresh(scope, source default 'ai', csv default null)` | text, text, text | uuid (run id) | `source` ∈ ai, csv (22023); csv needs non-empty text (22023); refused while a run is open (55000); audit `library_refresh_requested` |
+| `cancel_library_refresh(run_id)` | uuid | void | Only queued/running/review (55000); audit `library_refresh_cancelled` |
+| `decide_refresh_proposal(proposal_id, decision)` | uuid, text | void | `decision` ∈ approved, rejected, pending (22023); run must be in review (55000) |
+| `apply_library_refresh(run_id)` | uuid | int (applied) | Run must be in review (55000). Per approved proposal: takes `changes[field].new` for fields in `private.library_fields(entity)` only, `jsonb_populate_record` onto the row (or a new row), upsert; careers with `pathways` get their `education_pathways` deleted and re-inserted; appends `{run_id, reviewed_on, sources}` to `careers.sources.refresh` / `stream_options.sources`. Then sets `last_reviewed = today` on every row in scope, marks pending proposals skipped, run → applied; audit `library_refresh_applied` |
+| `archive_preview(candidates_before, leads_before)` | date, date | `{candidates: [{id, name, last_activity}], leads: [...]}` | Read-only |
+| `archive_inactive(candidates_before, leads_before)` | date or null each | `{candidates, leads}` (counts) | Admin or service role. Each cutoff ≥ 30 days ago (22023); null skips that entity. Candidate last activity = greatest of `created_at`, assessment started/completed, session `scheduled_at`, roadmap item `completed_at`, roadmap `published_at`, report `created_at`, outcome `recorded_at`; never picks a candidate with a future session. Lead last activity = greatest of `created_at`, `next_followup`; never paid/active. Sets `archived_at`, `archived_by`; audit `archive_inactive` |
+| `restore_archived(entity, id)` | text ∈ candidate, lead; uuid | void | P0002 when not archived; audit `archive_restored` |
+| `save_archive_settings(auto, candidate_days, lead_days)` | bool, int, int | void | Check constraints enforce 30–3650 days; audit `archive_settings_saved` |
+
+Error codes surfaced to the UI: `42501` not permitted, `22023` invalid input/state, `55000` wrong state for this action, `P0002` not found, `P0429` rate limited.
 
 ## 8. Storage
 
@@ -281,7 +302,15 @@ Writes: `swadharma_charts` (upsert; `insights` = lens, agreement, component deta
 
 Every page carries the verbatim disclaimer in the footer. `assemble()` strips `breakdown.swadharma`, unpublished and hidden matches, draft roadmaps and `notes_private` from every kind except case_file, whatever data is passed in (tested). Flow: the counsellor inserts a `reports` row (`content.status = requested`) → `render_pending` builds the context, renders with WeasyPrint, uploads to the `reports` bucket and sets `pdf_path` with `content = {status: rendered, rendered_at, renderer, snapshot}` exactly once.
 
-### 9.6 Jobs (`worker/scheduler.py`)
+### 9.6 Library refresh (`worker/library_refresh.py`)
+
+- `process_run(db, run)`: queued → running → review (or failed with `error`). Inserts proposals; `summary = {checked, proposals, errors[≤50]}`. If an admin cancelled meanwhile, the run stays cancelled.
+- **AI** (`ai`, `scheduled`): one Claude Messages call per entry in scope. Model `claude-opus-5-5`, adaptive thinking, `output_config.effort = medium`, `max_tokens` 16000, server-side fallbacks (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`). Tools: `web_search_20260209` (max 4 uses, approximate location IN) and a strict client tool `submit_proposal` `{changes: [{field (enum of editable fields), new_value_json}], rationale, sources: [{url, title}]}`. `pause_turn` is resumed by re-sending; a turn without the tool gets one nudge (max 6 turns); `refusal` skips the entry with a note. The system prompt asks for Indian authoritative sources, house style, unchanged fields kept, and complete pathway lists. Only library content is sent; no candidate data.
+- **CSV** (`csv`): `csv.DictReader`; columns as `src/lib/libraryCsv.ts`. Careers: `id, name, family, riasec_code, interest_weights, outlook, automation_exposure, description, day_in_life, typical_entry_paths, adjacent_emerging, workstyle_fit, values_fit, india_salary_band, aptitude_min, pathways`. Streams: `id, name, board, subjects, keeps_open_families, closes_families, notes`. Lists are `;`-separated, `india_salary_band`, `aptitude_min` and `pathways` are JSON. Rows match by id, then by case-insensitive name; an unknown id is an error; a blank id with a new name is a new entry (needs name, family, riasec_code, outlook for careers; name, subjects for streams). Duplicates and unknown columns are noted.
+- **Validation** (both sources): families from `families.FAMILIES`; RIASEC 1–3 distinct letters; `interest_weights` six numbers 0–1; outlook and automation enums; work-style letters R/A/P/D; aptitude bands from `BAND_RANK`; pathway levels from the `education_pathways` check. Invalid AI values are dropped with a note.
+- **Diff**: only fields that differ from the library become `changes`; empty/None means "no opinion", never "clear". Pathways compare as an order-free set.
+
+### 9.7 Jobs (`worker/scheduler.py`)
 
 | Schedule (Asia/Kolkata) | Job | Behaviour |
 |---|---|---|
@@ -289,13 +318,15 @@ Every page carries the verbatim disclaimer in the footer. `assemble()` strips `b
 | every minute | `job_refresh_candidates` | When a result is newer than `profile_summary.updated_at`: build profile, then `match.run` or `streams.run`. When opted in and `consent_at` is newer than the chart: `swadharma.run` |
 | every minute | `job_render_reports` | `reports.render_pending` |
 | every minute | `job_deliver` | Marks unsent notifications as sent and logs them (email/SMS hook point) |
+| every minute | `job_library_refresh` | Oldest queued library refresh → `library_refresh.process_run`; `library_refresh` notification to admins (ready or failed) |
+| every minute | `job_library_rematch` | Applied runs with `rematched_at` null → `match.run` / `streams.run` for every non-archived candidate with a `profile_summary`, then stamps `rematched_at` |
 | 02:15 daily | `job_report_sla` | `v_caseload` rows past `report_due_at` with no report → `report_sla` notification to the counsellor and admins |
 | 02:15 daily | `job_outcome_reminders` | 6 / 12 / 24 months (182 / 365 / 730 days) after `roadmaps.published_at`, with no outcome at that checkpoint → `outcome_<cp>` notification to the counsellor |
-| 1 Jan / Apr / Jul / Oct 09:00 | `job_outlook_refresh` | Careers with `last_reviewed` null or older than 90 days → admin notification |
+| 1 Jan / Apr / Jul / Oct 09:00 | `job_outlook_refresh` | With `ANTHROPIC_API_KEY` and no open run: inserts a `scheduled` run (scope all). Otherwise careers with `last_reviewed` null or older than 90 days → admin notification pointing to Refresh now / CSV |
 
-Notifications are upserted on (`user_id`, `kind`, `entity_id`) with ignore-duplicates, so repeats are no-ops. Missed roadmap items themselves are marked by the pg_cron job (§5.1). `python scheduler.py --once` runs every job once.
+Notifications are upserted on (`user_id`, `kind`, `entity_id`) with ignore-duplicates, so repeats are no-ops. Missed roadmap items themselves are marked by the pg_cron job (§5.1). Archived candidates are skipped by `job_refresh_candidates`, `job_outcome_reminders` and `job_library_rematch` (and by `job_report_sla` through `v_caseload`). `python scheduler.py --once` runs the polling and nightly jobs once; it leaves out the quarterly job so a smoke test never starts a paid AI refresh.
 
-### 9.7 Edge Functions
+### 9.8 Edge Functions
 
 | Function | Auth | Behaviour |
 |---|---|---|
@@ -306,11 +337,13 @@ Notifications are upserted on (`user_id`, `kind`, `entity_id`) with ignore-dupli
 
 | Concern | Design |
 |---|---|
-| Routing | React Router (`src/App.tsx`). `/cases`, `/cases/:id?tab=…` (counsellor, admin), `/me`, `/me/assess`, `/me/assess/:instrument` (candidate). Other routes render a placeholder until built. `RequireRole` redirects to the role home (`HOME_FOR_ROLE`) |
+| Routing | React Router (`src/App.tsx`). `/cases`, `/cases/:id?tab=…` (counsellor, admin), `/me`, `/me/assess`, `/me/assess/:instrument` (candidate), `/admin/careers` and `/admin/streams` (`LibraryPage`), `/admin/library/runs/:id` (`RefreshReview`), `/admin/archive` (`ArchivePage`) (admin). Other routes render a placeholder until built. `RequireRole` redirects to the role home (`HOME_FOR_ROLE`) |
 | Data layer | `src/lib/api/api.ts` interface with `supabaseApi.ts` (RLS, views, RPCs) and `demoApi.ts` (in-memory). `main.tsx` picks one by `DEMO_MODE` before rendering; demo personas sign in from the login page |
 | Case tabs | Overview · Assessments (re-administer) · Profile (charts, narrative, approve) · Swadharma 🔒 (counsellor/admin only; points, components, notes, lens, agreement, windows, Release dialog with reason and irreversibility checkbox) · Options (pin/hide/add, publish switch, counsellor-only Swadharma column) · Sessions (ICCC templates, private notes, summary, actions, attendance) · Roadmap (template, items, publish/pause/complete) · Reports (request, versions, signed download) · Documents |
 | Test runner | `my_instruments` → session → `next_item` loop; one item per screen; answers buffered and flushed to `save_responses` every 30 s, after each timed answer, on tab hide/pagehide and on exit; countdown from `started_at` and `server_now` (server wins); Back only in untimed sections; keyboard 1–5 / Enter; forced choice picks most and least |
 | Track switch | `TrackProvider` sets `html[data-track]`; Tailwind `junior:` variant; `COPY` dictionary per track. early_explorer: base type 19.5 px (17 px otherwise), friendlier copy, illustrations, stepper. Staff (and demo) can preview either track |
+| Library refresh | `LibraryPage`: Refresh now (scope select) → `request_library_refresh`, then the review page; polls every 10 s while a run is queued/running; CSV download builds the file in the browser with `toCsv` (`src/lib/libraryCsv.ts`, UTF-8 BOM for Excel); upload checks size (2 MB) and detects careers vs streams from the header (`detectCsv`) before calling the RPC. `RefreshReview`: per-proposal Now/Suggested table, rationale, sources; Approve/Reject toggles (`decide_refresh_proposal`), Approve all, Apply with a confirm dialog, Cancel |
+| Archive | `ArchivePage`: timeframe in months (stored as days: `round(m × 365 / 12)`, 1–120), auto-archive switch, cutoff dates (max one month ago), Preview dialog listing who would move, Archive, archived list with Restore |
 | Theme | Tokens in `src/index.css`: pine (deep teal), sand, saffron |
 | Errors | `ErrorBox` maps 42501 → no access, 22023 → validation message, P0429 → try again later |
 
@@ -318,11 +351,11 @@ Notifications are upserted on (`user_id`, `kind`, `entity_id`) with ignore-dupli
 
 | Suite | Command | Covers |
 |---|---|---|
-| SQL | `PGHOST=localhost PGUSER=postgres PGPASSWORD=postgres bash supabase/tests/run.sh` | RLS per role, triggers, RPCs, under-18 gate, append-only and write-once rules (`rls_test.sql` as `authenticator`, `owner_test.sql` as owner) |
-| Web + TS scorer | `npx vitest run` | Runner buffer/timer helpers, TS scorer against the shared fixtures |
+| SQL | `PGHOST=localhost PGUSER=postgres PGPASSWORD=postgres bash supabase/tests/run.sh` | RLS per role, triggers, RPCs, under-18 gate, append-only and write-once rules (`rls_test.sql` as `authenticator`, `owner_test.sql` as owner); library refresh lifecycle and admin-only access (`library_archive_test.sql`); archive preview, exclusions, caseload, assessment block, restore and auto-archive (`archive_owner_test.sql`) |
+| Web + TS scorer | `npx vitest run` | Runner buffer/timer helpers, TS scorer against the shared fixtures, library CSV export and header detection |
 | Types / build | `npx tsc -b && npx vite build` | Web app |
 | Edge Functions | `deno check supabase/functions/*/index.ts` | Type check |
-| Worker | `cd worker && pytest` | Scorer parity, matcher, streams, Swadharma (SAV 337, D9/D10, sub-lords, dashas, unknown time, banned words, junior windows), reports (disclaimer, no Swadharma or private notes outside case_file, 8-page junior, PDF render), scheduler, and an end-to-end pipeline on an in-memory database |
+| Worker | `cd worker && pytest` | Scorer parity, matcher, streams, Swadharma (SAV 337, D9/D10, sub-lords, dashas, unknown time, banned words, junior windows), reports (disclaimer, no Swadharma or private notes outside case_file, 8-page junior, PDF render), scheduler, library refresh (seed validates, CSV round-trip, edits/new/errors, AI loop with a fake client incl. `pause_turn` and refusal, jobs, quarterly queueing, rematch skipping archived), and an end-to-end pipeline on an in-memory database |
 
 Any change to policies, triggers or RPCs needs a matching SQL test. Regenerate seed data with `python3 supabase/seed/build_seed.py` (rewrites everything after `-- BEGIN GENERATED SEED`); regenerate scorer fixtures with `python3 supabase/seed/build_scoring_fixtures.py` then `UPDATE_FIXTURES=1 npx vitest run supabase/functions`.
 
@@ -332,3 +365,4 @@ Any change to policies, triggers or RPCs needs a matching SQL test. Regenerate s
 |---|---|---|
 | 1.0 | 2026-10-24 | Baseline from `001_init.sql` and the engine-rule spec |
 | 1.1 | 2026-10-24 | Start Here code landed: Edge Functions, web app, worker. Engine sections now describe the implemented formulas; `next_item` has no expiry grace; report storage path; worker and demo-mode configuration; test suites |
+| 1.2 | 2026-10-24 | Migration 002: library refresh tables, admin RPCs, archiving columns/settings/RPCs, auto-archive cron, `v_caseload` and `assessment_gate` changes; `library_refresh.py` (§9.6), new jobs, `ANTHROPIC_API_KEY`; admin pages; tests |

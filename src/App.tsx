@@ -10,6 +10,9 @@ import CasesPage from '@/pages/cases/CasesPage'
 import AssessList from '@/pages/me/AssessList'
 import MeHome from '@/pages/me/MeHome'
 import TestRunner from '@/pages/me/TestRunner'
+import ArchivePage from '@/pages/admin/ArchivePage'
+import LibraryPage from '@/pages/admin/LibraryPage'
+import RefreshReview from '@/pages/admin/RefreshReview'
 import Placeholder from '@/pages/Placeholder'
 import Landing from '@/pages/public/Landing'
 import Login from '@/pages/public/Login'
@@ -71,8 +74,10 @@ export default function App() {
               <Route path="/admin" element={<RequireRole roles={ADMIN}>{later('Dashboard', 'Funnel, revenue, counsellor utilisation, report turnaround, NPS and outcomes.')}</RequireRole>} />
               <Route path="/admin/leads" element={<RequireRole roles={ADMIN}>{later('Leads', 'Pipeline board with counsellor assignment and follow-up dates.')}</RequireRole>} />
               <Route path="/admin/counsellors" element={<RequireRole roles={ADMIN}>{later('Counsellors', 'Caseload and SLA per counsellor.')}</RequireRole>} />
-              <Route path="/admin/careers" element={<RequireRole roles={ADMIN}>{later('Careers', 'Career library editor and outlook refresh with source and last-reviewed date.')}</RequireRole>} />
-              <Route path="/admin/streams" element={<RequireRole roles={ADMIN}>{later('Streams', 'Stream options editor by board.')}</RequireRole>} />
+              <Route path="/admin/careers" element={<RequireRole roles={ADMIN}><LibraryPage /></RequireRole>} />
+              <Route path="/admin/streams" element={<RequireRole roles={ADMIN}><LibraryPage tab="stream" /></RequireRole>} />
+              <Route path="/admin/library/runs/:id" element={<RequireRole roles={ADMIN}><RefreshReview /></RequireRole>} />
+              <Route path="/admin/archive" element={<RequireRole roles={ADMIN}><ArchivePage /></RequireRole>} />
               <Route path="/admin/instruments" element={<RequireRole roles={ADMIN}>{later('Instruments', 'Versions, norms upload and activation.')}</RequireRole>} />
               <Route path="/admin/templates" element={<RequireRole roles={ADMIN}>{later('Templates', 'Roadmap and session-note templates.')}</RequireRole>} />
             </Route>

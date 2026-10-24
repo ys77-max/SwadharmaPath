@@ -37,9 +37,10 @@ export function navFor(role: Role, junior: boolean): NavItem[] {
         { to: '/admin', label: 'Dashboard', end: true },
         { to: '/admin/leads', label: 'Leads' },
         { to: '/admin/counsellors', label: 'Counsellors' },
-        { to: '/admin/careers', label: 'Careers' },
+        { to: '/admin/careers', label: 'Library' },
         { to: '/admin/instruments', label: 'Instruments' },
         { to: '/admin/templates', label: 'Templates' },
+        { to: '/admin/archive', label: 'Archive' },
         { to: '/cases', label: 'Cases' },
       ]
   }

@@ -6,23 +6,30 @@ Polling (every minute):
                         and Swadharma for consented candidates whose chart is missing or stale
   * render_reports      requested reports without a PDF
   * deliver             notifications not yet sent (log by default; plug in email/SMS here)
+  * library_refresh     queued library refresh runs → proposals for the admin to review
+  * library_rematch     after a refresh is applied, recompute every active candidate's matches
 Nightly (02:15 IST, after the pg_cron missed-items job):
   * report SLA check    counsellor + admins told when a report is overdue (7 days after assessments)
   * outcome reminders   6 / 12 / 24 months after the roadmap was published
 Quarterly (1 Jan / Apr / Jul / Oct, 09:00 IST):
-  * outlook refresh     admins reminded to review careers not reviewed in 90 days
+  * outlook refresh     queues an AI library refresh (needs ANTHROPIC_API_KEY); without a key, or
+                        while another refresh is open, admins are reminded to review stale careers
+Archived candidates (candidates.archived_at set) are skipped by every job.
 
 Run: python scheduler.py           (blocking scheduler)
-     python scheduler.py --once    (every job once, then exit; handy for cron or a smoke test)
+     python scheduler.py --once    (polling and nightly jobs once, then exit; handy for a smoke test.
+                                    The quarterly job is left out so a smoke test never starts a paid AI refresh)
 """
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from datetime import date, datetime, timedelta, timezone
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 
+import library_refresh
 import match
 import reports
 import scoring
@@ -71,7 +78,7 @@ def job_score_pending(db) -> int:
 
 def job_refresh_candidates(db) -> int:
     done = 0
-    for c in db.table("candidates").select("id, track, swadharma_opted_in").execute().data:
+    for c in db.table("candidates").select("id, track, swadharma_opted_in").is_("archived_at", "null").execute().data:
         latest = db.table("assessment_results").select("scored_at").eq("candidate_id", c["id"]) \
             .order("scored_at", desc=True).limit(1).execute().data
         prof = db.table("profile_summary").select("updated_at").eq("candidate_id", c["id"]).maybe_single().execute()
@@ -117,8 +124,10 @@ def job_outcome_reminders(db, today: date | None = None) -> int:
     today = today or date.today()
     sent = 0
     names = {u["id"]: u["full_name"] for u in db.table("users").select("id, full_name").execute().data}
-    for rm in db.table("roadmaps").select("id, candidate_id, published_at, candidates(counsellor_id, user_id)") \
+    for rm in db.table("roadmaps").select("id, candidate_id, published_at, candidates(counsellor_id, user_id, archived_at)") \
             .not_.is_("published_at", "null").execute().data:
+        if (rm.get("candidates") or {}).get("archived_at"):
+            continue
         recorded = {o["checkpoint"] for o in db.table("outcomes").select("checkpoint").eq("candidate_id", rm["candidate_id"]).execute().data}
         cand = rm.get("candidates") or {}
         name = names.get(cand.get("user_id")) or "candidate"
@@ -129,20 +138,64 @@ def job_outcome_reminders(db, today: date | None = None) -> int:
     return sent
 
 
+def _open_refresh(db) -> dict | None:
+    rows = db.table("library_refresh_runs").select("id, status").in_("status", ["queued", "running", "review"]).execute().data
+    return rows[0] if rows else None
+
+
 def job_outlook_refresh(db, today: date | None = None) -> int:
+    """Quarterly: queue an AI refresh of the whole library. Falls back to a reminder about
+    careers not reviewed in 90 days when there is no API key or a refresh is already open."""
     today = today or date.today()
+    if os.environ.get("ANTHROPIC_API_KEY") and not _open_refresh(db):
+        run = db.table("library_refresh_runs").insert({"scope": "all", "source": "scheduled", "status": "queued"}).execute().data[0]
+        log.info("queued scheduled library refresh %s", run["id"])
+        return 1
     cutoff = (today - timedelta(days=OUTLOOK_REVIEW_DAYS)).isoformat()
     stale = db.table("careers").select("id, name").or_(f"last_reviewed.is.null,last_reviewed.lt.{cutoff}").execute().data
     if not stale:
         return 0
     body = f"{len(stale)} careers have not been reviewed since {cutoff}: " + ", ".join(c["name"] for c in stale[:10]) + ("…" if len(stale) > 10 else "")
+    body += " Open Careers & streams and click Refresh now, or download the CSV, edit it and upload it."
     for uid in _admins(db):
         # entity_id is the first stale career so each quarter's reminder is distinct per batch
         _notify(db, uid, f"outlook_refresh_{today.year}q{(today.month - 1) // 3 + 1}", "Quarterly outlook refresh", body, "careers", stale[0]["id"])
     return len(stale)
 
 
-POLLING = [job_score_pending, job_refresh_candidates, job_render_reports, job_deliver]
+def job_library_refresh(db, client_factory=None) -> int:
+    """Queued refresh runs → proposals. Admins are told when a run is ready or failed."""
+    runs = db.table("library_refresh_runs").select("*").eq("status", "queued").order("created_at").limit(1).execute().data
+    for run in runs:
+        try:
+            summary = library_refresh.process_run(db, run, client_factory or library_refresh.anthropic_client)
+            title, body = "Library refresh ready to review", (
+                f"{summary['proposals']} suggested change(s) across {summary['checked']} item(s). Approve or reject them, then apply.")
+        except Exception as e:  # recorded on the run by process_run
+            title, body = "Library refresh failed", str(e)[:300]
+        for uid in _admins(db):
+            _notify(db, uid, "library_refresh", title, body, "library_refresh_runs", run["id"])
+    return len(runs)
+
+
+def job_library_rematch(db) -> int:
+    """After an applied refresh, recompute matches for every active candidate with a profile.
+    match.run / streams.run keep pinned, hidden, added and published rows."""
+    runs = db.table("library_refresh_runs").select("id").eq("status", "applied").is_("rematched_at", "null").execute().data
+    if not runs:
+        return 0
+    done = 0
+    profiled = {p["candidate_id"] for p in db.table("profile_summary").select("candidate_id").execute().data}
+    for c in db.table("candidates").select("id, track").is_("archived_at", "null").execute().data:
+        if c["id"] in profiled:
+            (streams.run if c["track"] == "early_explorer" else match.run)(db, c["id"])
+            done += 1
+    for r in runs:
+        db.table("library_refresh_runs").update({"rematched_at": datetime.now(timezone.utc).isoformat()}).eq("id", r["id"]).execute()
+    return done
+
+
+POLLING = [job_score_pending, job_refresh_candidates, job_render_reports, job_deliver, job_library_refresh, job_library_rematch]
 NIGHTLY = [job_report_sla, job_outcome_reminders]
 
 
@@ -160,7 +213,7 @@ def main(argv: list[str]) -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     db = client()
     if "--once" in argv:
-        for job in POLLING + NIGHTLY + [job_outlook_refresh]:
+        for job in POLLING + NIGHTLY:
             _safe(job, db)
         return
     sched = BlockingScheduler(timezone=IST)

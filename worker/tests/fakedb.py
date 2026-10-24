@@ -48,6 +48,7 @@ class Query:
     def eq(self, c, v): return self._f(lambda r: r.get(c) == v)
     def gte(self, c, v): return self._f(lambda r: r.get(c) is not None and str(r.get(c)) >= str(v))
     def lt(self, c, v): return self._f(lambda r: r.get(c) is not None and str(r.get(c)) < str(v))
+    def in_(self, c, vs): return self._f(lambda r: r.get(c) in vs)
     def is_(self, c, v): return self._f(lambda r: r.get(c) is None if v == "null" else r.get(c) == v)
 
     @property

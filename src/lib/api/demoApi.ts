@@ -1,5 +1,5 @@
 import { ROADMAP_TEMPLATES } from '../constants'
-import type { AssessmentSession, CaseloadRow, CounsellingSession, NextItem, Report } from '../types'
+import type { ArchiveSettings, AssessmentSession, CaseloadRow, CounsellingSession, LibraryRow, NextItem, RefreshProposal, RefreshRun, Report } from '../types'
 import type { Api } from './api'
 import * as d from './demoData'
 
@@ -32,6 +32,28 @@ function setPersona(uid: string | null) {
 
 function flatItems(instrumentId: string) {
   return d.demoItems(instrumentId).flatMap((s) => s.items.map((item, index) => ({ section: s, item, index })))
+}
+
+// Library refresh and archiving live only in memory in demo mode. A refresh goes straight to
+// review with one sample suggestion, standing in for the worker.
+const runs: RefreshRun[] = []
+const proposals: RefreshProposal[] = []
+const reviewed: Record<string, string> = {}
+const archivedAt: Record<string, string> = {}
+let archiveSettings: ArchiveSettings = { auto_archive: false, candidate_inactive_days: 730, lead_inactive_days: 365, last_auto_run_at: null, updated_at: now() }
+const openRun = () => runs.find((r) => ['queued', 'running', 'review'].includes(r.status))
+const dayKey = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10)
+function lastActivity(cid: string) {
+  const c = d.candidates.find((x) => x.id === cid)!
+  const times = [c.created_at, ...d.sessions.filter((s) => s.candidate_id === cid).map((s) => s.scheduled_at),
+    ...d.assessmentSessions.filter((a) => a.candidate_id === cid).flatMap((a) => [a.started_at, a.completed_at ?? '']),
+    ...d.reports.filter((r) => r.candidate_id === cid).map((r) => r.created_at)]
+  return times.filter(Boolean).sort().at(-1) ?? c.created_at
+}
+function archivable(before: string) {
+  return d.candidates
+    .filter((c) => !archivedAt[c.id] && lastActivity(c.id) < before && !d.sessions.some((s) => s.candidate_id === c.id && s.scheduled_at > now()))
+    .map((c) => ({ id: c.id, name: d.users.find((u) => u.id === c.user_id)?.full_name ?? null, last_activity: lastActivity(c.id) }))
 }
 
 function caseRow(cid: string): CaseloadRow {
@@ -81,7 +103,7 @@ export const demoApi: Api = {
   },
 
   async caseload() {
-    const mine = d.candidates.filter((c) => me()?.role === 'admin' || c.counsellor_id === personaId)
+    const mine = d.candidates.filter((c) => !archivedAt[c.id] && (me()?.role === 'admin' || c.counsellor_id === personaId))
     return wait(mine.map((c) => caseRow(c.id)))
   },
   async getCase(cid) {
@@ -252,6 +274,97 @@ export const demoApi: Api = {
   },
   async documentUrl() {
     return demoApi.reportUrl('x')
+  },
+
+  // ---------------------------------------------------------------- admin: library refresh and archiving
+  async libraryRows(entity) {
+    const rows: LibraryRow[] = entity === 'career'
+      ? d.careers.map((c) => ({ ...c, pathways: [] }))
+      : d.streams.map((st) => ({ ...st }))
+    return wait(rows.map((r) => ({ ...r, last_reviewed: reviewed[r.id] ?? null })))
+  },
+  async refreshRuns() {
+    return wait([...runs].sort((a, b) => b.created_at.localeCompare(a.created_at)))
+  },
+  async refreshRun(runId) {
+    const run = runs.find((r) => r.id === runId)
+    if (!run) throw new Error('Refresh not found')
+    return wait({ run, proposals: proposals.filter((p) => p.run_id === runId) })
+  },
+  async requestLibraryRefresh(scope, source, csv) {
+    if (openRun()) throw new Error('a library refresh is already in progress; finish or cancel it first')
+    if (source === 'csv' && !csv?.trim()) throw new Error('upload a CSV file first')
+    const run: RefreshRun = { id: id('run'), scope, source, status: 'review', requested_by: personaId, error: null, created_at: now(),
+      finished_at: now(), applied_at: null, rematched_at: null, summary: { checked: 0, proposals: 0, errors: [] } }
+    if (source === 'ai' && scope !== 'streams') {
+      const c = d.careers[0]
+      proposals.push({ id: id('prop'), run_id: run.id, entity: 'career', entity_id: c.id, entity_name: c.name, decision: 'pending', decided_at: null,
+        changes: { outlook: { old: c.outlook, new: c.outlook === 'growing' ? 'transforming' : 'growing' } },
+        rationale: 'Demo suggestion. In production the worker checks each entry against current Indian sources and cites them here.',
+        sources: [{ url: 'https://www.weforum.org/publications/the-future-of-jobs-report-2025/', title: 'WEF Future of Jobs Report 2025' }] })
+      run.summary = { checked: d.careers.length, proposals: 1, errors: [] }
+    } else {
+      run.summary = { checked: 0, proposals: 0, errors: ['Demo mode: the worker reads uploaded CSVs and stream suggestions in production.'] }
+    }
+    runs.push(run)
+    return wait(run.id)
+  },
+  async cancelLibraryRefresh(runId) {
+    const r = runs.find((x) => x.id === runId && ['queued', 'running', 'review'].includes(x.status))
+    if (!r) throw new Error('this refresh is not open')
+    r.status = 'cancelled'
+    return wait(undefined)
+  },
+  async decideProposal(proposalId, decision) {
+    const p = proposals.find((x) => x.id === proposalId)
+    if (!p) throw new Error('this change is not awaiting review')
+    p.decision = decision
+    p.decided_at = decision === 'pending' ? null : now()
+    return wait(undefined)
+  },
+  async applyLibraryRefresh(runId) {
+    const r = runs.find((x) => x.id === runId && x.status === 'review')
+    if (!r) throw new Error('this refresh is not awaiting review')
+    let applied = 0
+    for (const p of proposals.filter((x) => x.run_id === runId)) {
+      if (p.decision === 'pending') p.decision = 'skipped'
+      if (p.decision !== 'approved') continue
+      const target = (p.entity === 'career' ? d.careers : d.streams).find((x) => x.id === p.entity_id) as unknown as Record<string, unknown> | undefined
+      if (target) for (const [f, v] of Object.entries(p.changes)) if (f in target) target[f] = v.new
+      applied++
+    }
+    const today = new Date().toISOString().slice(0, 10)
+    if (r.scope !== 'streams') d.careers.forEach((c) => (reviewed[c.id] = today))
+    if (r.scope !== 'careers') d.streams.forEach((st) => (reviewed[st.id] = today))
+    Object.assign(r, { status: 'applied', applied_at: now(), rematched_at: now(), summary: { ...r.summary, applied } })
+    return wait(applied)
+  },
+  async archiveSettings() {
+    return wait(archiveSettings)
+  },
+  async saveArchiveSettings(s) {
+    archiveSettings = { ...archiveSettings, ...s, updated_at: now() }
+    return wait(undefined)
+  },
+  async archivePreview(candidatesBefore) {
+    return wait({ candidates: archivable(candidatesBefore), leads: [] })
+  },
+  async archiveInactive(candidatesBefore) {
+    if (candidatesBefore && candidatesBefore > dayKey(30)) throw new Error('the candidate cutoff must be at least 30 days ago')
+    const hit = candidatesBefore ? archivable(candidatesBefore) : []
+    hit.forEach((c) => (archivedAt[c.id] = now()))
+    return wait({ candidates: hit.length, leads: 0 })
+  },
+  async archived() {
+    return wait(Object.entries(archivedAt).map(([cid, at]) => ({
+      entity: 'candidate' as const, id: cid, archived_at: at,
+      name: d.users.find((u) => u.id === d.candidates.find((c) => c.id === cid)?.user_id)?.full_name ?? null,
+    })))
+  },
+  async restoreArchived(_entity, rid) {
+    if (!archivedAt[rid]) throw new Error('nothing archived with that id')
+    delete archivedAt[rid]
+    return wait(undefined)
   },
 
   // ---------------------------------------------------------------- candidate

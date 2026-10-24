@@ -2,7 +2,7 @@
 
 Procedures for developers and the technical owner.
 
-> Last updated 2026-10-24. Production environment and go-live checklist added to SOP-T1.
+> Last updated 2026-10-24. Library refresh and archiving: Railway `ANTHROPIC_API_KEY`, migration 002, worker jobs and stuck-run handling (SOP-T1, T2, T4, T5).
 
 | ID | SOP |
 |---|---|
@@ -32,9 +32,9 @@ Procedures for developers and the technical owner.
 
 | Piece | Where | Notes |
 |---|---|---|
-| Database, Auth, Storage, Edge Functions | Supabase project `swadharmapath` (ref `fskmeqrjtwdswaoqwjkh`, region ap-south-1) | `001_init.sql` applied (schema, then seed in parts); Edge Functions `score_instrument` (`verify_jwt` off, it checks the caller itself) and `generate_signed_report_url` (`verify_jwt` on) |
+| Database, Auth, Storage, Edge Functions | Supabase project `swadharmapath` (ref `fskmeqrjtwdswaoqwjkh`, region ap-south-1) | `001_init.sql` applied (schema, then seed in parts); `002_library_refresh_archive.sql` to apply with the library refresh and archive release; Edge Functions `score_instrument` (`verify_jwt` off, it checks the caller itself) and `generate_signed_report_url` (`verify_jwt` on) |
 | Web | Vercel project `swadharmapath`, production branch `main` | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` set for production, preview and development |
-| Worker | Railway service from `worker/` (Dockerfile), one instance | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
+| Worker | Railway service from `worker/` (Dockerfile), one instance | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY` (AI library refresh; optional) |
 
 ### First go-live checklist
 
@@ -45,6 +45,7 @@ Procedures for developers and the technical owner.
    Without it, completed assessments are scored only by the worker's minute poll, not instantly.
 2. Auth → URL configuration: Site URL = the Vercel production URL; add `<production URL>/**` to Redirect URLs.
 3. Railway: new service from the GitHub repo, root directory `worker`, builder Dockerfile, one replica; set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. Check logs for the scheduler start line.
+   Add `ANTHROPIC_API_KEY` (from the Anthropic Console, a key used only for this worker) to turn on **Refresh now with AI** and the quarterly AI refresh. Without it, CSV refresh and archiving still work and the quarterly job only sends a reminder. A full refresh of the seeded library costs roughly ₹500; set a monthly spend limit in the Console.
 4. First admin: sign up in the web app, then in the SQL editor run `update public.users set role = 'admin' where email = '<email>';`. Create counsellor accounts from /admin.
 5. Smoke test as in step 5 above.
 
@@ -52,7 +53,7 @@ Procedures for developers and the technical owner.
 
 1. Add a new file `supabase/migrations/NNN_description.sql`. Do not edit an applied migration.
 2. Every new table: enable RLS and add policies. Sensitive tables get **no** candidate/parent policy.
-3. Add tests in `supabase/tests/rls_test.sql` or `owner_test.sql`.
+3. Add tests in `supabase/tests/` (`rls_test.sql`, `owner_test.sql`, or a new file added to `run.sh`). `run.sh` applies every file in `supabase/migrations/` in name order.
 4. Run locally:
    ```bash
    PGHOST=localhost PGUSER=postgres ./supabase/tests/run.sh
@@ -72,13 +73,18 @@ Procedures for developers and the technical owner.
 2. Check logs after deploy for scheduler start and a successful database connection.
 3. If scoring or reports stop: check Railway logs, then Supabase logs for `score_instrument`, then the Vault secrets used by `invoke_edge_function`.
 4. Re-run scoring for a session by re-triggering the worker job for that session (command to be documented when the worker lands).
+5. **Library refresh.** The worker processes one queued run at a time (`job_library_refresh`, every minute) and, after an admin applies a run, recalculates matches (`job_library_rematch`). Logs show `queued scheduled library refresh …`, `library refresh … failed` and per-job counts.
+6. **Stuck refresh.** If the worker restarted mid-run, the run stays `running` and blocks new refreshes. Ask an admin to click **Cancel refresh** on the review page (or run `select public.cancel_library_refresh('<run id>')` as an admin), then start a new one.
+7. **AI refresh failing.** Check that `ANTHROPIC_API_KEY` is set on Railway, the key is active and the Console spend limit is not reached. The run's error shows the reason; individual entries that failed or were declined are listed under "Notes from the check" and the rest of the run still goes to review.
+8. **Auto-archive** runs in the database (`pg_cron` job `swadharmapath-auto-archive`, 02:30 IST), not in the worker. Check `cron.job_run_details` if `archive_settings.last_auto_run_at` stops moving while auto-archive is on.
 
 ## SOP-T5 Secret rotation
 
 1. Rotate the service-role key in Supabase.
 2. Update it in Railway (worker), Edge Function secrets and Vault `service_role_key`.
-3. Rotate the anon key only if exposed; update `VITE_SUPABASE_ANON_KEY` in Vercel and redeploy.
-4. Verify scoring (complete a test assessment) and report download.
+3. Rotate `ANTHROPIC_API_KEY` in the Anthropic Console if exposed or when staff with access leave; update it on Railway and redeploy the worker.
+4. Rotate the anon key only if exposed; update `VITE_SUPABASE_ANON_KEY` in Vercel and redeploy.
+5. Verify scoring (complete a test assessment) and report download.
 
 Never put the service-role key in a `VITE_*` variable or in the repo.
 
