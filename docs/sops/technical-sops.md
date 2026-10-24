@@ -2,7 +2,7 @@
 
 Procedures for developers and the technical owner.
 
-> Last updated 2026-10-24.
+> Last updated 2026-10-24. Production environment and go-live checklist added to SOP-T1.
 
 | ID | SOP |
 |---|---|
@@ -27,6 +27,26 @@ Procedures for developers and the technical owner.
 6. Note the release in the change history of any doc you changed.
 
 **Rollback:** web — redeploy the previous Vercel deployment; worker — redeploy the previous Railway release; database — write a forward-fixing migration (never edit an applied migration).
+
+### Production environment
+
+| Piece | Where | Notes |
+|---|---|---|
+| Database, Auth, Storage, Edge Functions | Supabase project `swadharmapath` (ref `fskmeqrjtwdswaoqwjkh`, region ap-south-1) | `001_init.sql` applied (schema, then seed in parts); Edge Functions `score_instrument` (`verify_jwt` off, it checks the caller itself) and `generate_signed_report_url` (`verify_jwt` on) |
+| Web | Vercel project `swadharmapath`, production branch `main` | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` set for production, preview and development |
+| Worker | Railway service from `worker/` (Dockerfile), one instance | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
+
+### First go-live checklist
+
+1. Vault: `project_url` is set. Add `service_role_key` once, in the Supabase SQL editor (never in the repo or chat):
+   ```sql
+   select vault.create_secret('<service_role key from Project Settings → API keys>', 'service_role_key');
+   ```
+   Without it, completed assessments are scored only by the worker's minute poll, not instantly.
+2. Auth → URL configuration: Site URL = the Vercel production URL; add `<production URL>/**` to Redirect URLs.
+3. Railway: new service from the GitHub repo, root directory `worker`, builder Dockerfile, one replica; set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. Check logs for the scheduler start line.
+4. First admin: sign up in the web app, then in the SQL editor run `update public.users set role = 'admin' where email = '<email>';`. Create counsellor accounts from /admin.
+5. Smoke test as in step 5 above.
 
 ## SOP-T2 Database migration
 

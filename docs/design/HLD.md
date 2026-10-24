@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Document | HLD |
-| Version | 1.1 |
+| Version | 1.2 |
 | Last updated | 2026-10-24 |
 | Code baseline | `feat/start-here`: database, Edge Functions, web app (Start Here routes) and worker. |
 | Related | [BRD](../brd/BRD.md) · [LLD](LLD.md) |
@@ -182,8 +182,8 @@ sequenceDiagram
 
 | Component | Platform | Config |
 |---|---|---|
-| Web | Vercel | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
-| Database, Auth, Storage, Edge Functions | Supabase | Migrations in `supabase/migrations`; Vault secrets `project_url`, `service_role_key`; extensions `pgcrypto`, `pg_net`, `pg_cron` |
+| Web | Vercel project `swadharmapath` (team YSS), production branch `main`; `vercel.json` rewrites client routes to `index.html` and sets basic security headers | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
+| Database, Auth, Storage, Edge Functions | Supabase project `SwadharmaPath` (ref `fskmeqrjtwdswaoqwjkh`, ap-south-1) | Migrations in `supabase/migrations`; Vault secrets `project_url`, `service_role_key`; extensions `pgcrypto`, `pg_net`, `pg_cron` |
 | Worker | Railway (`worker/Dockerfile`, `worker/railway.json`; one instance) | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
 
 Environments: local (Supabase CLI or plain Postgres for SQL tests) → staging Supabase project → production. See [Release and deployment SOP](../sops/technical-sops.md#sop-t1-release-and-deployment).
@@ -241,3 +241,4 @@ erDiagram
 |---|---|---|
 | 1.0 | 2026-10-24 | Baseline from spec and `feat/start-here` database migration |
 | 1.1 | 2026-10-24 | Edge Functions, web app (Start Here routes, demo mode) and worker implemented; worker variables, schedule and deployment confirmed |
+| 1.2 | 2026-10-24 | Production go-live: Supabase project created and seeded, Edge Functions deployed, Vercel project linked to the repo with `vercel.json` for SPA routing and headers |
