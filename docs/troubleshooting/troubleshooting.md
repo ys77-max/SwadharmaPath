@@ -90,6 +90,9 @@ The worker has not rendered it yet; it polls every minute. If it is still missin
 ### T-30 "Only an admin can change a role"
 Role changes require an admin account. Self-signed-up users are always candidate or parent until an admin changes them.
 
+### T-30a "Invalid login credentials" for a new staff member
+The account does not exist yet or the password is wrong. The site has no sign-up screen: create the account in Supabase (**Authentication → Users → Add user → Create new user**, tick **Auto Confirm User**), then set its role. The very first admin is promoted from the SQL editor ([SOP-T1](../sops/technical-sops.md#first-go-live-checklist) step 4).
+
 ### T-31 Dashboard numbers look wrong
 Funnel counts depend on lead stages being kept current; turnaround counts from the last completed assessment to the first candidate-facing report. Check stages and report kinds before raising a bug.
 

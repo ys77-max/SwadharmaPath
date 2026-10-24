@@ -28,8 +28,8 @@ The public form is rate-limited: the same phone or email can submit 3 times an h
 
 ## 3. Users and roles
 
-- People who sign up themselves can only be candidates or parents.
-- To create a counsellor or admin, invite the user and then change their role. Only an admin can change a role, and the change is enforced in the database.
+- There is no public sign-up screen. Every new account starts as a candidate until an admin changes its role.
+- To create a counsellor or admin, add or invite the user in Supabase (**Authentication → Users → Add user**) and then change their role. Only an admin can change a role, and the change is enforced in the database.
 
 ## 4. Counsellors (/admin/counsellors)
 Caseload and report SLA per counsellor. Reassign candidates when someone is overloaded or on leave.
