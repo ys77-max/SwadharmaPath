@@ -313,3 +313,61 @@ export interface NextItem {
   }
   answer?: { a: unknown; rt?: number } | null
 }
+
+// ---------------------------------------------------------------- library refresh and archiving (admin)
+
+export type LibraryEntity = 'career' | 'stream'
+export type RefreshScope = 'careers' | 'streams' | 'all'
+export type RefreshStatus = 'queued' | 'running' | 'review' | 'applied' | 'failed' | 'cancelled'
+export type ProposalDecision = 'pending' | 'approved' | 'rejected' | 'skipped'
+
+/** A careers or stream_options row as the admin library and CSV export see it. Careers carry `pathways`. */
+export type LibraryRow = { id: string; name: string; last_reviewed?: string | null } & Record<string, unknown>
+
+export interface RefreshRun {
+  id: string
+  scope: RefreshScope
+  source: 'ai' | 'csv' | 'scheduled'
+  status: RefreshStatus
+  requested_by: string | null
+  summary: { checked?: number; proposals?: number; applied?: number; errors?: string[] }
+  error: string | null
+  created_at: string
+  finished_at: string | null
+  applied_at: string | null
+  rematched_at: string | null
+}
+
+export interface RefreshProposal {
+  id: string
+  run_id: string
+  entity: LibraryEntity
+  entity_id: string | null
+  entity_name: string
+  changes: Record<string, { old: unknown; new: unknown }>
+  sources: { url?: string; title?: string }[]
+  rationale: string | null
+  decision: ProposalDecision
+  decided_at: string | null
+}
+
+export interface ArchiveSettings {
+  auto_archive: boolean
+  candidate_inactive_days: number
+  lead_inactive_days: number
+  last_auto_run_at: string | null
+  updated_at: string
+}
+
+export interface ArchiveCandidateRow {
+  id: string
+  name: string | null
+  last_activity: string | null
+}
+
+export interface ArchivedRow {
+  entity: 'candidate' | 'lead'
+  id: string
+  name: string | null
+  archived_at: string
+}

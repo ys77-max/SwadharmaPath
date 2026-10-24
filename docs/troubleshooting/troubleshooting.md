@@ -54,6 +54,9 @@ Name must be 1–120 characters, notes up to 2000 characters, and you must give 
 ### T-20 A candidate is missing from my caseload
 You see only candidates where you are the assigned counsellor. Ask an admin to check the assignment.
 
+### T-29 "This case is archived; ask your counsellor to restore it"
+The candidate was archived for inactivity, so new assessments are blocked and the case is hidden from your caseload. Ask an admin to restore it from **Archive** (`/admin/archive`); it reappears straight away.
+
 ### T-21 Results did not appear after a candidate completed a test
 1. Check **Assessments**: status should be completed.
 2. If completed but not scored for more than 15 minutes, report it to the technical owner with the candidate name and instrument. (Technical: check `score_instrument` logs and the Vault secrets `project_url` and `service_role_key`; a missing secret logs a warning and skips the call.)
@@ -90,6 +93,27 @@ Funnel counts depend on lead stages being kept current; turnaround counts from t
 ### T-32 Instrument not showing for candidates
 Only active instruments matching the track variant are shown (early explorer → junior; others → standard). Check **is active** and the variant.
 
+### T-33 "A library refresh is already in progress; finish or cancel it first"
+Only one refresh can be open. Open it from the banner on the Library page and apply or cancel it. If it has said "Checking sources…" for over an hour, the worker probably restarted: click **Cancel refresh** and start again ([SOP-T4](../sops/technical-sops.md#sop-t4-worker-operations)).
+
+### T-34 Refresh failed: "ANTHROPIC_API_KEY is not set on the worker"
+AI refresh is not set up. The technical owner adds the key on Railway ([SOP-T1](../sops/technical-sops.md#first-go-live-checklist)). Meanwhile use **Download CSV → Upload edited CSV**.
+
+### T-35 Refresh stays on "Queued" or "Checking sources…"
+The worker picks up a run within a minute and a full AI refresh takes 15 to 30 minutes. If it stays queued, the worker is not running (check Railway). If a run is stuck, cancel it and start again.
+
+### T-36 CSV upload: "Could not tell whether this is the careers or the streams file" or "The first row must be the column headings"
+Start from **Careers CSV** or **Streams CSV** and keep the heading row as downloaded. Save as CSV (UTF-8), not .xlsx. Files over 2 MB are refused; upload careers and streams separately.
+
+### T-37 Some CSV rows were skipped
+They are listed under "Notes from the check" on the review page with the reason: unknown family name (use one of the 15 families exactly), outlook not one of growing / stable / transforming / declining, interest weights not six numbers between 0 and 1, an id that is not in the library (clear it to add a new entry), a new career missing name, family, RIASEC code or outlook, invalid JSON in salary band, aptitude or pathways. Fix those rows and upload again.
+
+### T-38 "No changes suggested" after a refresh
+Everything checked matched the library. Click **Mark reviewed** to stamp the entries as reviewed today.
+
+### T-39 "The candidate cutoff must be at least 30 days ago" / someone is missing from the archive preview
+Cutoffs must be at least 30 days in the past. Candidates with a session booked, and leads that are paid or active, are never archived; any activity after the cutoff (a session, assessment, roadmap update, report or outcome) also keeps a case active.
+
 ## For developers
 
 ### T-40 SQL tests fail to start
@@ -104,6 +128,9 @@ The web build has no `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`, or `VITE_DE
 ### T-44 Worker tests or PDF rendering fail with a Pango / `OSError` message
 WeasyPrint needs Pango. Install `libpango-1.0-0 libpangoft2-1.0-0` (the Dockerfile already does).
 
+### T-45 New SQL test file not running
+`run.sh` applies every migration in `supabase/migrations/` in name order, but test files are listed explicitly at the end of `run.sh`. Add new test files there.
+
 ### T-42 CI "docs check" failed
 Your PR changes code without changing `/docs`, or changes a mapped area without its mapped doc. Update the docs listed in the failure message. See [SOP-T8](../sops/technical-sops.md#sop-t8-documentation-maintenance).
 
@@ -112,5 +139,7 @@ Your PR changes code without changing `/docs`, or changes a mapped area without 
 | Code | Meaning | Typical cause |
 |---|---|---|
 | 42501 | Not permitted | Role or ownership rule, missing consent, immutable record |
-| 22023 | Invalid input or state | Bad form data, test not in progress, back navigation in timed section |
+| 22023 | Invalid input or state | Bad form data, test not in progress, back navigation in timed section, archive cutoff too recent, empty CSV |
+| 55000 | Wrong state for this action | A library refresh already open, or the refresh is no longer awaiting review |
+| P0002 | Not found | Restoring something that is not archived |
 | P0429 | Rate limited | Too many enquiries |

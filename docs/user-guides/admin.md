@@ -1,6 +1,6 @@
 # Admin guide
 
-For agency administrators. Your home page is **/admin**. Navigation: Dashboard | Leads | Counsellors | Careers | Instruments | Templates.
+For agency administrators. Your home page is **/admin**. Navigation: Dashboard | Leads | Counsellors | Library | Instruments | Templates | Archive.
 
 > Last updated 2026-10-24. Procedures are in the [Operations SOPs](../sops/operations-sops.md) and [Technical SOPs](../sops/technical-sops.md).
 
@@ -34,11 +34,35 @@ The public form is rate-limited: the same phone or email can submit 3 times an h
 ## 4. Counsellors (/admin/counsellors)
 Caseload and report SLA per counsellor. Reassign candidates when someone is overloaded or on leave.
 
-## 5. Career library (/admin/careers)
-Edit careers (family, RIASEC code, weights, aptitude minimums, work-style and values fit, description, day in the life, entry paths, salary band, outlook, automation exposure, adjacent emerging roles) and education pathways. When refreshing outlook, record the **source** and set **last reviewed**. You get a quarterly reminder. Seed content is marked "seed – verify before launch" and must be reviewed.
+## 5. Careers & streams library (/admin/careers, /admin/streams)
 
-## 6. Streams (/admin/streams)
-Edit stream options per board: subjects, career families each keeps open and closes, notes. CBSE is seeded with 8 streams.
+The **Library** page lists every career and stream with its **last reviewed** date. Entries never reviewed, or not reviewed in 90 days, are flagged in amber. Seed content is marked "seed – verify before launch" and should be reviewed with the first refresh.
+
+### 5.1 Refresh with AI (quarterly, one click)
+
+1. Choose what to refresh: **Careers and streams**, **Careers** or **Streams**.
+2. Click **Refresh now**. You land on the review page; the check takes about 15 to 30 minutes for the full library. You can leave the page; admins get a notification when it is ready (or if it failed).
+3. The system checks each entry against current Indian sources (exam bodies, regulators, labour data) and suggests changes with a short reason and links to its sources. Only fields that would change are shown.
+4. This also runs on its own on **1 January, April, July and October**. If the AI key is not set up, you get a reminder instead.
+
+### 5.2 Correct by spreadsheet (CSV)
+
+1. Click **Careers CSV** or **Streams CSV** to download the current library.
+2. Edit it in Excel or Google Sheets. Keep the heading row. Lists are separated with semicolons (for example `English; Physics; Chemistry`). Salary band, minimum aptitude and pathways are JSON; leave them alone unless you are comfortable editing JSON.
+3. An **empty cell keeps the current value**. To add a new career or stream, add a row with an **empty id**; a new career needs at least name, family, RIASEC code and outlook.
+4. Click **Upload edited CSV** (2 MB maximum). The page recognises whether it is the careers or streams file. Rows with problems are listed under "Notes from the check" and skipped; the rest become suggested changes.
+
+### 5.3 Review and apply
+
+On the review page (`/admin/library/runs/…`):
+
+1. For each suggestion, compare **Now** and **Suggested**, read the reason and open the sources if needed.
+2. Click **Approve** or **Reject**. Click again to undo. **Approve all** approves everything still undecided.
+3. Click **Apply N approved** and confirm. Approved changes are written, every entry in the refresh is marked **reviewed today** (whether it changed or not), and undecided suggestions are skipped.
+4. Candidates' career and stream matches are then recalculated within a few minutes. Counsellors' pinned, hidden, added and published choices are kept.
+5. **Cancel refresh** closes a run without changing anything. Only one refresh can be open at a time.
+
+Every request, cancellation and apply is recorded in the audit log, and the sources are saved on each changed entry.
 
 ## 7. Instruments (/admin/instruments)
 Manage versions, upload norms and **activate** an instrument version. Only active versions are served. Test items, scoring keys and norms are never sent to candidates' browsers. See [SOP-O9](../sops/operations-sops.md#sop-o9-instrument-version-change).
@@ -46,5 +70,27 @@ Manage versions, upload norms and **activate** an instrument version. Only activ
 ## 8. Templates (/admin/templates)
 Roadmap templates and session-note templates (by ICCC stage).
 
-## 9. Audit
-Admins can read the audit log (consents, disclaimer acceptances, Swadharma releases). No one, including admins, can edit or delete audit entries or Swadharma releases.
+## 9. Archive (/admin/archive)
+
+Archiving moves inactive candidates and leads out of caseloads, reminders, matching and lead lists. **Nothing is deleted**: reports, sessions, consent, Swadharma records and the audit log stay as they are, and you can restore any time.
+
+### 9.1 Set the timeframe
+
+1. Under **Timeframe**, enter how many months without activity count as inactive, separately for candidates (default 24) and leads (default 12). Use 1 to 120 months.
+2. Activity means sign-up, an assessment, a session, a roadmap update, a report or an outcome (for leads: creation or the follow-up date).
+3. Turn on **Archive automatically every night** if you want the system to archive with this timeframe at 02:30 IST. It is off until you turn it on. Click **Save**.
+
+### 9.2 Archive now
+
+1. Under **Archive now**, pick the cutoff dates (they must be at least 30 days ago). They start from your timeframe.
+2. Click **Preview** to see exactly who would move and when each was last active.
+3. Click **Archive** to confirm.
+
+Candidates with a session booked, and leads that are **paid** or **active**, are never archived.
+
+### 9.3 Restore
+
+The **Archived** list shows everything archived and when. Click **Restore** to bring a candidate or lead back; they reappear in caseloads and lists straight away. An archived candidate cannot start an assessment until restored.
+
+## 10. Audit
+Admins can read the audit log (consents, disclaimer acceptances, Swadharma releases, library refreshes, archiving and restores). No one, including admins, can edit or delete audit entries or Swadharma releases.

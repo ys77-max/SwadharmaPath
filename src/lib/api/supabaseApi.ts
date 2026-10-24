@@ -1,7 +1,7 @@
 import { ROADMAP_TEMPLATES } from '../constants'
 import { supabase } from '../supabase'
 import type {
-  AppUser, AssessmentResult, AssessmentSession, BirthDetailsSummary, CaseloadRow, Candidate, Career, CareerMatch,
+  AppUser, ArchiveSettings, ArchivedRow, LibraryRow, RefreshProposal, RefreshRun, AssessmentResult, AssessmentSession, BirthDetailsSummary, CaseloadRow, Candidate, Career, CareerMatch,
   CounsellingSession, DocumentFile, InstrumentMeta, MyInstrument, NextItem, ProfileSummary, Report, Roadmap,
   RoadmapItem, StreamMatch, StreamOption, SwadharmaChart, SwadharmaRelease, SwadharmaScore,
 } from '../types'
@@ -24,6 +24,7 @@ async function uid(): Promise<string> {
 const SESSION_COLS = 'id, candidate_id, instrument_id, started_at, completed_at, status, device, duration_sec'
 const INSTRUMENT_COLS = 'id, code, name, version, track_variant, time_limit_min, is_active'
 const CAREER_COLS = 'id, name, family, riasec_code, outlook, automation_exposure, description'
+const RUN_COLS = 'id, scope, source, status, requested_by, summary, error, created_at, finished_at, applied_at, rematched_at'
 
 function addDays(iso: string, days: number) {
   const d = new Date(iso)
@@ -226,6 +227,57 @@ export const supabaseApi: Api = {
     const { data, error } = await supabase.storage.from('documents').createSignedUrl(path, 900)
     if (error) throw new Error(error.message)
     return data.signedUrl
+  },
+
+  // ---------------------------------------------------------------- admin: library refresh and archiving
+  async libraryRows(entity) {
+    if (entity === 'stream') return must(await supabase.from('stream_options').select('*').order('name')) as LibraryRow[]
+    const careers = must(await supabase.from('careers').select('*').order('name')) as LibraryRow[]
+    const pathways = must(await supabase.from('education_pathways').select('career_id, level, stream_required, exams, degrees, institutions, duration, alternative_routes, notes')) as ({ career_id: string } & Record<string, unknown>)[]
+    return careers.map((c) => ({ ...c, pathways: pathways.filter((p) => p.career_id === c.id).map(({ career_id: _, ...p }) => p) }))
+  },
+  async refreshRuns() {
+    return must(await supabase.from('library_refresh_runs').select(RUN_COLS).order('created_at', { ascending: false }).limit(20)) as RefreshRun[]
+  },
+  async refreshRun(runId) {
+    const run = must(await supabase.from('library_refresh_runs').select(RUN_COLS).eq('id', runId).single()) as RefreshRun
+    const proposals = must(await supabase.from('library_refresh_proposals').select('*').eq('run_id', runId).order('entity').order('entity_name')) as RefreshProposal[]
+    return { run, proposals }
+  },
+  async requestLibraryRefresh(scope, source, csv) {
+    return must(await supabase.rpc('request_library_refresh', { p_scope: scope, p_source: source, p_csv: csv ?? null })) as string
+  },
+  async cancelLibraryRefresh(runId) {
+    must(await supabase.rpc('cancel_library_refresh', { p_run_id: runId }))
+  },
+  async decideProposal(proposalId, decision) {
+    must(await supabase.rpc('decide_refresh_proposal', { p_proposal_id: proposalId, p_decision: decision }))
+  },
+  async applyLibraryRefresh(runId) {
+    return must(await supabase.rpc('apply_library_refresh', { p_run_id: runId })) as number
+  },
+  async archiveSettings() {
+    return must(await supabase.from('archive_settings').select('auto_archive, candidate_inactive_days, lead_inactive_days, last_auto_run_at, updated_at').single()) as ArchiveSettings
+  },
+  async saveArchiveSettings(s) {
+    must(await supabase.rpc('save_archive_settings', { p_auto: s.auto_archive, p_candidate_days: s.candidate_inactive_days, p_lead_days: s.lead_inactive_days }))
+  },
+  async archivePreview(candidatesBefore, leadsBefore) {
+    return must(await supabase.rpc('archive_preview', { p_candidates_before: candidatesBefore, p_leads_before: leadsBefore })) as Awaited<ReturnType<Api['archivePreview']>>
+  },
+  async archiveInactive(candidatesBefore, leadsBefore) {
+    return must(await supabase.rpc('archive_inactive', { p_candidates_before: candidatesBefore, p_leads_before: leadsBefore })) as { candidates: number; leads: number }
+  },
+  async archived() {
+    const cands = must(await supabase.from('candidates').select('id, archived_at, users!candidates_user_id_fkey(full_name)').not('archived_at', 'is', null).order('archived_at', { ascending: false })) as unknown as { id: string; archived_at: string; users: { full_name: string } | null }[]
+    const leads = must(await supabase.from('leads').select('id, name, archived_at').not('archived_at', 'is', null).order('archived_at', { ascending: false })) as { id: string; name: string | null; archived_at: string }[]
+    return [
+      ...cands.map((c): ArchivedRow => ({ entity: 'candidate', id: c.id, name: c.users?.full_name ?? null, archived_at: c.archived_at })),
+      ...leads.map((l): ArchivedRow => ({ entity: 'lead', id: l.id, name: l.name, archived_at: l.archived_at })),
+    ]
+  },
+  async restoreArchived(entity, id) {
+    must(await supabase.rpc('restore_archived', { p_entity: entity, p_id: id }))
   },
 
   // ---------------------------------------------------------------- candidate

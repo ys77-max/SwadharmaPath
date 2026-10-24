@@ -20,6 +20,7 @@ Standard operating procedures for counsellors and admins. Each SOP lists who doe
 | O12 | [Outcome follow-up](#sop-o12-outcome-follow-up) | Counsellor |
 | O13 | [Staff onboarding and offboarding](#sop-o13-staff-onboarding-and-offboarding) | Admin |
 | O14 | [Privacy requests and data incidents](#sop-o14-privacy-requests-and-data-incidents) | Admin |
+| O15 | [Archiving inactive cases and leads](#sop-o15-archiving-inactive-cases-and-leads) | Admin |
 
 ---
 
@@ -120,13 +121,19 @@ Only if the candidate (and guardian for minors) opted in, and the family has ask
 
 ## SOP-O10 Career library and outlook refresh
 
-**Trigger:** quarterly reminder, or new evidence.
+**Trigger:** the quarterly AI refresh (1 January, April, July, October; admins are notified when it is ready to review), the quarterly reminder if AI refresh is not set up, or new evidence (for example a changed exam pattern).
 
-1. For each career due for review, check outlook, automation exposure, salary band and exams against current sources.
-2. Update the fields, add the **source** and set **last reviewed** to today.
-3. Replace any content still marked "seed – verify before launch".
+1. Open **Library** (`/admin/careers`). If the quarterly run has not started, click **Refresh now** with scope **Careers and streams**. For a known correction, download the CSV, fix it and upload it instead.
+2. When the run is **Ready to review**, open it. For each suggestion:
+   - Check the source opens and is authoritative (official exam body, regulator, government data, recognised industry report). Reject suggestions whose source does not support the change.
+   - Check the wording keeps the house style: plain English, no guarantees, salary bands stay indicative.
+   - Approve or reject.
+3. Read "Notes from the check" for entries the system could not review; check those by hand or by CSV.
+4. Click **Apply** and confirm. Every entry in scope is marked reviewed today; matches are recalculated for active candidates within minutes.
+5. Tell counsellors in the weekly meeting about notable changes (for example a career's outlook moving), since published options they have shared may now read differently.
+6. Replace any content still marked "seed – verify before launch" (the first refresh should cover most of it).
 
-**Record:** `careers.sources`, `careers.last_reviewed`.
+**Record:** `library_refresh_runs` and `library_refresh_proposals` (who approved what and when), `careers.sources.refresh` / `stream_options.sources`, `last_reviewed`, and `audit_log` entries `library_refresh_requested` / `library_refresh_applied`.
 
 ## SOP-O11 Roadmap and missed items
 
@@ -158,3 +165,15 @@ Only if the candidate (and guardian for minors) opted in, and the family has ask
 2. Contain: revoke sessions, rotate keys if needed (see [SOP-T5](technical-sops.md#sop-t5-secret-rotation)).
 3. Inform affected families and, where required by the DPDP Act, the authorities.
 4. Write a short post-incident note and update docs or controls.
+
+## SOP-O15 Archiving inactive cases and leads
+
+**Trigger:** set up once, then review twice a year; or a backlog of dormant cases cluttering caseloads.
+
+1. Agree the timeframe with the owner (defaults: candidates 24 months, leads 12 months without activity). Enter it under **Archive → Timeframe** and save.
+2. Before turning on **Archive automatically every night**, run **Archive now → Preview** with the same cutoffs and check the list with counsellors. Remove anyone who should stay by giving them activity (for example booking a follow-up session) before archiving.
+3. Archive, or turn on auto-archive.
+4. If a family returns, **Restore** the candidate from the Archived list before booking sessions or assessments.
+5. Archiving is not deletion. A deletion request still follows [SOP-O14](#sop-o14-privacy-requests-and-data-incidents).
+
+**Record:** `candidates.archived_at` / `archived_by`, `leads.archived_at` / `archived_by`, `archive_settings`, and `audit_log` entries `archive_inactive` (with `auto: true` for nightly runs), `archive_restored`, `archive_settings_saved`.

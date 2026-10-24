@@ -1,5 +1,6 @@
 import type {
-  AppUser, AssessmentResult, AssessmentSession, BirthDetailsSummary, CaseloadRow, Candidate, Career, CareerMatch,
+  AppUser, ArchiveCandidateRow, ArchivedRow, ArchiveSettings, LibraryEntity, LibraryRow, ProposalDecision, RefreshProposal,
+  RefreshRun, RefreshScope, AssessmentResult, AssessmentSession, BirthDetailsSummary, CaseloadRow, Candidate, Career, CareerMatch,
   CounsellingSession, DocumentFile, InstrumentMeta, MyInstrument, Narrative, NextItem, ProfileSummary, Report,
   ReportKind, Roadmap, RoadmapItem, RoadmapTemplate, StreamMatch, StreamOption, SwadharmaChart, SwadharmaRelease,
   SwadharmaScore, Visibility,
@@ -67,6 +68,23 @@ export interface Api {
   documents(candidateId: string): Promise<DocumentFile[]>
   uploadDocument(candidateId: string, file: File): Promise<void>
   documentUrl(path: string): Promise<string>
+
+  // admin: library refresh (worker drafts, admin approves, apply_library_refresh writes)
+  libraryRows(entity: LibraryEntity): Promise<LibraryRow[]>
+  refreshRuns(): Promise<RefreshRun[]>
+  refreshRun(runId: string): Promise<{ run: RefreshRun; proposals: RefreshProposal[] }>
+  requestLibraryRefresh(scope: RefreshScope, source: 'ai' | 'csv', csv?: string): Promise<string>
+  cancelLibraryRefresh(runId: string): Promise<void>
+  decideProposal(proposalId: string, decision: Exclude<ProposalDecision, 'skipped'>): Promise<void>
+  applyLibraryRefresh(runId: string): Promise<number>
+
+  // admin: archiving (nothing is deleted; restore brings a case back)
+  archiveSettings(): Promise<ArchiveSettings>
+  saveArchiveSettings(s: Pick<ArchiveSettings, 'auto_archive' | 'candidate_inactive_days' | 'lead_inactive_days'>): Promise<void>
+  archivePreview(candidatesBefore: string, leadsBefore: string): Promise<{ candidates: ArchiveCandidateRow[]; leads: ArchiveCandidateRow[] }>
+  archiveInactive(candidatesBefore: string | null, leadsBefore: string | null): Promise<{ candidates: number; leads: number }>
+  archived(): Promise<ArchivedRow[]>
+  restoreArchived(entity: 'candidate' | 'lead', id: string): Promise<void>
 
   // candidate
   myCandidate(): Promise<Candidate | null>
