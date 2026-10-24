@@ -74,7 +74,10 @@ Reports cannot be edited. Generate again to create a new version.
 Case files are counsellor-only by design. Generate a candidate, candidate_junior, parent or stream_choice report for families.
 
 ### T-27 Swadharma tab is empty
-The candidate did not opt in, or the engine has not run yet. If birth time is unknown, expect fewer components and confidence "low".
+The candidate did not opt in, or the engine has not run yet (the worker checks every minute once consent and birth place coordinates exist). If birth time is unknown, expect only Moon-sign and strength components and confidence "low".
+
+### T-28 A report has no Download button
+The worker has not rendered it yet; it polls every minute. If it is still missing after 10 minutes, report it to the technical owner (check the worker logs for `job_render_reports`).
 
 ## For admins
 
@@ -94,6 +97,12 @@ Only active instruments matching the track variant are shown (early explorer →
 
 ### T-41 `pg_net` / `pg_cron` not available notice
 Expected on plain Postgres; the migration skips them. On Supabase, enable both extensions.
+
+### T-43 The app shows demo people (Ananya, Meera) instead of real data
+The web build has no `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`, or `VITE_DEMO_MODE=true`. Set the variables in Vercel and redeploy.
+
+### T-44 Worker tests or PDF rendering fail with a Pango / `OSError` message
+WeasyPrint needs Pango. Install `libpango-1.0-0 libpangoft2-1.0-0` (the Dockerfile already does).
 
 ### T-42 CI "docs check" failed
 Your PR changes code without changing `/docs`, or changes a mapped area without its mapped doc. Update the docs listed in the failure message. See [SOP-T8](../sops/technical-sops.md#sop-t8-documentation-maintenance).

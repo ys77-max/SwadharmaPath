@@ -3,9 +3,9 @@
 | Field | Value |
 |---|---|
 | Document | HLD |
-| Version | 1.0 |
+| Version | 1.1 |
 | Last updated | 2026-10-24 |
-| Code baseline | `feat/start-here` @ `6177c0a` (database schema, RLS, seeds, SQL tests). Frontend, Edge Functions and worker follow the spec and are marked *planned* until merged. |
+| Code baseline | `feat/start-here`: database, Edge Functions, web app (Start Here routes) and worker. |
 | Related | [BRD](../brd/BRD.md) · [LLD](LLD.md) |
 
 > Update this document in the same pull request as any change to components, integrations, deployment, data flow or the security model.
@@ -65,7 +65,7 @@ flowchart TB
 
 ## 3. Components
 
-### 3.1 Web app (*planned; scaffold exists*)
+### 3.1 Web app (*Start Here routes implemented: `/cases`, `/cases/:id`, `/me`, `/me/assess`; other routes show a placeholder*)
 
 | Area | Routes | Notes |
 |---|---|---|
@@ -75,7 +75,7 @@ flowchart TB
 | Counsellor | `/cases`, `/cases/:id` (9 tabs), `/schedule`, `/reports/queue` | Swadharma 🔒 tab |
 | Admin | `/admin`, `/admin/leads`, `/admin/counsellors`, `/admin/careers`, `/admin/streams`, `/admin/instruments`, `/admin/templates` | |
 
-Route guard: everything except the public routes needs a session; after login the user is sent to the home for `users.role` (`/me`, `/family`, `/cases`, `/admin`). Supabase client: `src/lib/supabase.ts`, configured from `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+Route guard: everything except the public routes needs a session; after login the user is sent to the home for `users.role` (`/me`, `/family`, `/cases`, `/admin`). Supabase client: `src/lib/supabase.ts`, configured from `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. All data access goes through one `Api` interface with a Supabase implementation and an in-memory demo implementation; demo mode (`VITE_DEMO_MODE=true`, or no Supabase variables) lets reviewers click through every role without a backend.
 
 ### 3.2 Supabase database (*implemented in `supabase/migrations/001_init.sql`*)
 
@@ -87,14 +87,14 @@ Route guard: everything except the public routes needs a session; after login th
 - Triggers for signup, role guard, lead rate limit, under-18 gate, scoring call, roadmap guard, report immutability and versioning, Swadharma release and append-only tables.
 - Seed data: 20 careers with pathways, 8 CBSE stream options, junior and standard instrument versions with placeholder items.
 
-### 3.3 Edge Functions (*planned*)
+### 3.3 Edge Functions (*implemented*)
 
 | Function | Trigger | Responsibility |
 |---|---|---|
-| `score_instrument` | `pg_net` call from the `assessment_completed` trigger | Fast scoring of the completed session (mirror of `worker/scoring.py`) and write to `assessment_results`; enqueue the worker for full profile/matching |
+| `score_instrument` | `pg_net` call from the `assessment_completed` trigger | Fast scoring of the completed session (mirror of `worker/scoring.py`, same fixtures) and write to `assessment_results`. The worker picks the new result up on its next poll for profile and matching |
 | `generate_signed_report_url` | Called by the web app | Checks the caller may read the report (through RLS), then returns a 15-minute signed URL from the private `reports` bucket |
 
-### 3.4 Worker (*planned*)
+### 3.4 Worker (*implemented*)
 
 | Module | Responsibility |
 |---|---|
@@ -104,7 +104,8 @@ Route guard: everything except the public routes needs a session; after login th
 | `swadharma.py` | Swiss Ephemeris (Lahiri) charts and family points into `swadharma_charts`/`swadharma_scores` |
 | `karakatwa.json` | Editable planet → career-family map |
 | `reports.py` | WeasyPrint PDFs for six report kinds into `reports/` bucket |
-| `scheduler.py` | APScheduler jobs: nightly nudges, SLA check, outcome reminders; quarterly outlook reminder |
+| `scheduler.py` | APScheduler: minute polling (score fallback, refresh profile/matches/Swadharma, render reports, deliver notifications); nightly SLA check and outcome reminders; quarterly outlook reminder |
+| `db.py` | Service-role client from `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` |
 
 ## 4. Key flows
 
@@ -157,8 +158,9 @@ sequenceDiagram
 | Job | Where | Time |
 |---|---|---|
 | Mark overdue roadmap items `missed` and create notification rows | `pg_cron` → `private.mark_missed_roadmap_items()` | 02:00 IST (20:30 UTC) |
-| Report SLA check, outcome checkpoint reminders (6/12/24 m) | Worker `scheduler.py` | Nightly |
-| Outlook refresh reminder to admin | Worker `scheduler.py` | Quarterly |
+| Report SLA check, outcome checkpoint reminders (6/12/24 m) | Worker `scheduler.py` | 02:15 IST |
+| Outlook refresh reminder to admin | Worker `scheduler.py` | 1 Jan/Apr/Jul/Oct, 09:00 IST |
+| Scoring fallback, profile/match/Swadharma refresh, report rendering, notification delivery | Worker `scheduler.py` | Every minute |
 
 ## 5. Security architecture
 
@@ -182,7 +184,7 @@ sequenceDiagram
 |---|---|---|
 | Web | Vercel | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
 | Database, Auth, Storage, Edge Functions | Supabase | Migrations in `supabase/migrations`; Vault secrets `project_url`, `service_role_key`; extensions `pgcrypto`, `pg_net`, `pg_cron` |
-| Worker | Railway | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (names to be confirmed when the worker lands) |
+| Worker | Railway (`worker/Dockerfile`, `worker/railway.json`; one instance) | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
 
 Environments: local (Supabase CLI or plain Postgres for SQL tests) → staging Supabase project → production. See [Release and deployment SOP](../sops/technical-sops.md#sop-t1-release-and-deployment).
 
@@ -217,15 +219,15 @@ erDiagram
 ## 8. Quality attributes and testing
 
 - **SQL tests** (`supabase/tests/run.sh`) build a throwaway database, apply the migration and run RLS tests as each role, plus owner-level tests. Run them on every database change.
-- Frontend: Vitest (configured), Oxlint.
-- Worker: unit tests per engine rule (to be added with the worker).
+- Frontend: Vitest (runner helpers and the TS scorer), `tsc -b`, `vite build`; Playwright click-through in demo mode during development.
+- Edge Functions: `deno check`; the TS scorer and the Python scorer pass the same fixture file.
+- Worker: `pytest` per engine rule (SAV 337 checksum, divisional charts, KP sub-lords, banned lens words, no Swadharma in family reports) plus an end-to-end run on an in-memory database.
 - Docs check: CI fails a pull request that changes code without updating `/docs` ([CONTRIBUTING](../../CONTRIBUTING.md)).
 
 ## 9. Open items
 
 | Item | Owner |
 |---|---|
-| Worker env variable names and job schedule times | Build thread, when `/worker` lands |
 | Notification delivery channel (email/SMS/WhatsApp) | Business decision |
 | Validated instrument items and norms | Agency |
 | Report templates and branding assets | Agency |
@@ -238,3 +240,4 @@ erDiagram
 | Version | Date | Change |
 |---|---|---|
 | 1.0 | 2026-10-24 | Baseline from spec and `feat/start-here` database migration |
+| 1.1 | 2026-10-24 | Edge Functions, web app (Start Here routes, demo mode) and worker implemented; worker variables, schedule and deployment confirmed |
