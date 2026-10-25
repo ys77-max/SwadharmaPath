@@ -11,6 +11,18 @@ end $$;
 select private.mark_missed_roadmap_items() as missed_again \gset
 do $$ begin assert (select count(*) from notifications) = 2, 'job is idempotent'; end $$;
 
+-- assessment battery v0.2: one active version per track, placeholders retired
+do $$ begin
+  assert private.track_variant('early_explorer') = 'junior' and private.track_variant('student') = 'standard'
+     and private.track_variant('professional') = 'adult', 'track to variant mapping';
+  assert (select count(*) from instruments where is_active and track_variant = 'junior') = 7, '7 junior instruments';
+  assert (select count(*) from instruments where is_active and track_variant = 'standard') = 6, '6 standard instruments';
+  assert (select count(*) from instruments where is_active and track_variant = 'adult') = 7, '7 adult instruments';
+  assert not exists (select 1 from instruments where is_active and version <> '0.2-original'), 'only v0.2 is active';
+  assert (select count(*) from instruments i, jsonb_array_elements(i.items->'sections') s, jsonb_array_elements(s->'items')
+          where i.is_active and i.track_variant = 'standard') = 265, 'standard battery has 265 questions';
+end $$;
+
 -- trigger secret check (service role only; see rls_test for the denial)
 do $$ begin
   assert public.verify_trigger_secret('test-trigger-secret'), 'matching trigger secret accepted';

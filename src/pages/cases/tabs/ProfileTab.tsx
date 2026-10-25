@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Input, Label, Textarea } from '@/components/ui/input'
 import { api } from '@/lib/api'
-import { APTITUDE_LABEL, RIASEC_LABEL, WORKSTYLE_LABEL } from '@/lib/constants'
+import { ADAPTABILITY_LABEL, ANCHOR_LABEL, APTITUDE_LABEL, RIASEC_LABEL, WORKSTYLE_LABEL, variantFor } from '@/lib/constants'
 import type { AssessmentResult, Narrative } from '@/lib/types'
 import { useAsync } from '@/lib/useAsync'
 import { fmtDate } from '@/lib/utils'
@@ -26,7 +26,7 @@ export default function ProfileTab({ bundle }: TabProps) {
   const c = bundle.candidate
   const junior = c.track === 'early_explorer'
   const { data, error, loading, reload } = useAsync(async () => {
-    const [results, profile, instruments] = await Promise.all([api.assessmentResults(c.id), api.profile(c.id), api.instrumentsFor(junior ? 'junior' : 'standard')])
+    const [results, profile, instruments] = await Promise.all([api.assessmentResults(c.id), api.profile(c.id), api.instrumentsFor(variantFor(c.track), true)])
     return { results, profile, codes: Object.fromEntries(instruments.map((i) => [i.id, i.code])) }
   }, [c.id])
   const [n, setN] = useState<Narrative>({ strengths: [], watch_outs: [], themes: [], summary: '' })
@@ -46,6 +46,8 @@ export default function ProfileTab({ bundle }: TabProps) {
   const workstyle = byCode(results, codes, 'workstyle')
   const bigfive = byCode(results, codes, 'bigfive')
   const values = byCode(results, codes, 'values') ?? byCode(results, codes, 'school_values')
+  const anchors = byCode(results, codes, 'career_anchors')
+  const adaptability = byCode(results, codes, 'adaptability')
 
   const update = (patch: Partial<Narrative>) => { setN((x) => ({ ...x, ...patch })); setDirty(true) }
   const save = async () => {
@@ -168,6 +170,18 @@ export default function ProfileTab({ bundle }: TabProps) {
             ) : <p className="text-sm text-muted">Values not scored yet</p>}
           </CardContent>
         </Card>
+        {(anchors || adaptability) && (
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Career anchors and readiness for change</CardTitle>
+              <CardDescription>Mean agreement from 1 to 5. Anchors are what the person will not give up; readiness is how prepared they are to manage a move.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-6 md:grid-cols-2">
+              <ScaleBars title="Career anchors" result={anchors} labels={ANCHOR_LABEL} />
+              <ScaleBars title="Readiness for change" result={adaptability} labels={ADAPTABILITY_LABEL} />
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <Card>
@@ -218,6 +232,23 @@ function ListEditor({ label, items, onChange }: { label: string; items: string[]
         <Input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), add())} placeholder={`Add ${label.toLowerCase()}`} />
         <Button size="icon" variant="secondary" onClick={add} aria-label={`Add ${label}`}><Plus /></Button>
       </div>
+    </div>
+  )
+}
+
+function ScaleBars({ title, result, labels }: { title: string; result: AssessmentResult | undefined; labels: Record<string, string> }) {
+  if (!result) return <div><div className="text-sm font-semibold">{title}</div><p className="text-sm text-muted">Not scored yet</p></div>
+  const raw = result.raw as Record<string, number>
+  const order = ((result.derived.order as string[]) ?? Object.keys(raw))
+  return (
+    <div className="space-y-2">
+      <div className="text-sm font-semibold">{title}</div>
+      {order.map((k) => (
+        <div key={k}>
+          <div className="flex justify-between text-sm"><span>{labels[k] ?? k}</span><span className="text-muted">{raw[k]?.toFixed(1)}</span></div>
+          <div className="mt-1 h-2 rounded-full bg-sand-200"><div className="h-2 rounded-full bg-pine-600" style={{ width: `${((raw[k] ?? 1) - 1) * 25}%` }} /></div>
+        </div>
+      ))}
     </div>
   )
 }

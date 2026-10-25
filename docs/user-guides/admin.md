@@ -72,6 +72,8 @@ Every request, cancellation and apply is recorded in the audit log, and the sour
 ## 7. Instruments (/admin/instruments)
 Manage versions, upload norms and **activate** an instrument version. Only active versions are served. Test items, scoring keys and norms are never sent to candidates' browsers. See [SOP-O9](../sops/operations-sops.md#sop-o9-instrument-version-change).
 
+The active battery is **v0.2** (original questions, placeholder norms), with one version per track: Class 8–10 (stream choice, 7 assessments, about 167 questions), Class 11–12 (course and career, 6 assessments, about 265) and professionals (growth or change, 7 assessments including career anchors and readiness for change, about 277). The page itself is not built yet; new versions are loaded by the technical owner ([SOP-T3](../sops/technical-sops.md#sop-t3-regenerating-seed-data)). Percentiles stay indicative until norms are built from real results or licensed norms are loaded.
+
 ## 8. Templates (/admin/templates)
 Roadmap templates and session-note templates (by ICCC stage).
 

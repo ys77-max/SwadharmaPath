@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Document | BRD |
-| Version | 1.3 |
+| Version | 1.4 |
 | Status | Baseline for V1 (launch) |
 | Last updated | 2026-10-24 |
 | Source | SwadharmaPath PRD (Sections 1, 3, 6, 8–13, 15, 17) as translated into the build prompt |
@@ -45,7 +45,7 @@ This BRD states what the business needs from the platform, who uses it, the rule
 
 1. Lead form and lead pipeline with counsellor assignment and follow-up reminders.
 2. Track-aware onboarding, including guardian consent for under-18s and optional Swadharma opt-in with versioned consent text.
-3. Test runner with autosave, timers and resume; six instruments, with junior variants for `early_explorer`.
+3. Test runner with autosave, timers and resume; a battery tailored to the candidate's objective: junior (`early_explorer`, stream choice), standard (`student`, course and career choice) and adult (`professional`, career growth or change).
 4. Scoring → results → profile, with counsellor approval before the candidate sees the profile.
 5. Career matching (student, professional) and stream recommendation (early_explorer), with counsellor curation and a publish gate.
 6. Career library with education pathways and outlook; stream options by board. Admin refreshes the library quarterly (AI-drafted changes or an edited CSV), approving each change before it applies.
@@ -131,7 +131,8 @@ IDs are stable; reference them in pull requests and tests.
 
 | ID | Requirement | Priority |
 |---|---|---|
-| FR-A1 | Instruments: interest, aptitude, work-style, Big Five (standard only), values (school-values for junior), learning, subject enjoyment; each has a junior and/or standard variant and a version. | P1 |
+| FR-A1 | Instruments: interest, aptitude, work-style, Big Five, values (school-values for junior), learning, subject enjoyment, career anchors and readiness for change; each has a junior, standard and/or adult variant and a version. | P1 |
+| FR-A8 | Each track takes one battery tailored to its objective. Junior (Class 8–10, stream choice): interests, subject enjoyment, six aptitude areas (numerical, verbal, abstract, spatial, mechanical, speed and accuracy), personality, work style, values, learning; about 167 questions. Standard (Class 11–12, course and career): interests, seven aptitude areas (adds logical reasoning), personality, work style, work values, learning; about 265 questions. Adult (professionals, growth or change): work interests, five reasoning areas (numerical, verbal, abstract, spatial, logical), personality, work style, work values, career anchors, readiness for change; about 277 questions. Every aptitude area has at least 8 questions and its own timer. | P1 |
 | FR-A2 | Test runner shows one item per screen with a progress bar and estimated time. | P1 |
 | FR-A3 | Answers autosave at least every 30 seconds; a candidate can close the browser and resume. | P1 |
 | FR-A4 | Timed sub-tests show a timer; once a timed section starts its clock cannot be restarted and earlier items cannot be revisited. | P1 |
@@ -143,7 +144,7 @@ IDs are stable; reference them in pull requests and tests.
 
 | ID | Requirement | Priority |
 |---|---|---|
-| FR-P1 | Results include RIASEC code, aptitude bands, work-style graphs and pattern flags, Big Five percentiles, top values. | P1 |
+| FR-P1 | Results include RIASEC code, aptitude bands for every area taken, work-style graphs and pattern flags, Big Five percentiles, top values and, for professionals, career anchors and readiness for change. | P1 |
 | FR-P2 | Counsellor edits a plain-language narrative (strengths, watch-outs, themes) and approves the profile. | P1 |
 | FR-P3 | Candidate and parent see results and profile only after counsellor approval. | P1 |
 
@@ -259,7 +260,7 @@ IDs are stable; reference them in pull requests and tests.
 ## 11. Assumptions, constraints and dependencies
 
 - Hosting: Vercel (web), Supabase (database, auth, storage, Edge Functions), GitHub Actions on a timer (Python worker; any Docker host such as Render also works).
-- Instrument items in the seed data are placeholders. Licensed or original validated items and norms must be loaded before launch.
+- Instrument items (battery v0.2) are original and unvalidated, and their norms are placeholders. Percentiles and bands are indicative until norms are built from real results or licensed items and norms are loaded.
 - Career library and outlook seed content is marked "seed – verify before launch" and must be reviewed by the agency.
 - Revenue is a manual flag in V1.
 
@@ -309,3 +310,4 @@ All P1 items in Section 4.1 are demonstrable end to end with seed data, and:
 | 1.1 | 2026-10-24 | Quarterly library refresh by admin (AI-drafted or CSV, approved per change) and admin archiving with an admin-set timeframe: scope items 6 and 13, FR-C5 to FR-C8, FR-D4, FR-D5, BR-11 to BR-13 |
 | 1.2 | 2026-10-24 | Hosting assumption: the worker runs on GitHub Actions (free) instead of Railway |
 | 1.3 | 2026-10-24 | Library expanded to 148 careers and 43 stream options across boards; streams filtered to the candidate's board (FR-C3, new FR-C9). Demo cases for training and testing |
+| 1.4 | 2026-10-25 | Assessment battery v0.2 tailored to the objective: junior, standard and new adult versions (scope item 3, FR-A1, new FR-A8, FR-P1); norms assumption restated |

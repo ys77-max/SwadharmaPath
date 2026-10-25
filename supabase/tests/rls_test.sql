@@ -29,7 +29,7 @@ end $$;
 select tests.expect_error($$ select items from instruments $$, 'permission denied');
 select tests.expect_error($$ select * from instruments $$, 'permission denied');
 select tests.expect_error($$ select public.verify_trigger_secret('test-trigger-secret') $$, 'permission denied');
-do $$ begin assert (select count(*) from instruments where track_variant = 'standard') = 6, 'instrument metadata readable'; end $$;
+do $$ begin assert (select count(*) from instruments where track_variant = 'standard' and is_active) = 6, 'instrument metadata readable'; end $$;
 select tests.expect_error($$ update users set role = 'admin' where id = auth.uid() $$, 'only an admin');
 select tests.expect_error($$ select public.submit_birth_details('10000000-0000-0000-0000-000000000001', null, null, null, null, null, null, null, 'v1') $$, 'not your candidate');
 reset role;
@@ -65,14 +65,14 @@ reset role;
 select set_config('request.jwt.claims', :minor, false); set role authenticated;
 select tests.expect_error($$
   insert into assessment_sessions (candidate_id, instrument_id)
-  select '10000000-0000-0000-0000-000000000001', id from instruments where code = 'interest' and track_variant = 'junior' $$,
+  select '10000000-0000-0000-0000-000000000001', id from instruments where code = 'interest' and track_variant = 'junior' and is_active $$,
   'guardian consent');
 reset role;
 -- counsellors are gated too (trigger)
 select set_config('request.jwt.claims', :c1, false); set role authenticated;
 select tests.expect_error($$
   insert into assessment_sessions (candidate_id, instrument_id)
-  select '10000000-0000-0000-0000-000000000001', id from instruments where code = 'interest' and track_variant = 'junior' $$,
+  select '10000000-0000-0000-0000-000000000001', id from instruments where code = 'interest' and track_variant = 'junior' and is_active $$,
   'guardian consent');
 reset role;
 select set_config('request.jwt.claims', :minor, false); set role authenticated;
@@ -83,14 +83,14 @@ select public.give_guardian_consent('10000000-0000-0000-0000-000000000001') is n
 reset role;
 select set_config('request.jwt.claims', :minor, false); set role authenticated;
 insert into assessment_sessions (candidate_id, instrument_id)
-select '10000000-0000-0000-0000-000000000001', id from instruments where code = 'interest' and track_variant = 'junior';
-do $$ begin assert (select count(*) from my_instruments()) = 6, 'junior candidate sees 6 junior instruments'; end $$;
+select '10000000-0000-0000-0000-000000000001', id from instruments where code = 'interest' and track_variant = 'junior' and is_active;
+do $$ begin assert (select count(*) from my_instruments()) = 7, 'junior candidate sees 7 junior instruments'; end $$;
 reset role;
 
 -- ---------------------------------------------------------------- Test runner RPCs
 select set_config('request.jwt.claims', :adult, false); set role authenticated;
 insert into assessment_sessions (candidate_id, instrument_id)
-select '10000000-0000-0000-0000-000000000002', id from instruments where code = 'aptitude' and track_variant = 'standard'
+select '10000000-0000-0000-0000-000000000002', id from instruments where code = 'aptitude' and track_variant = 'standard' and is_active
 returning id as apt_session \gset
 select set_config('tests.apt', :'apt_session', false);
 do $$

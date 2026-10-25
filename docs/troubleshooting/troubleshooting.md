@@ -64,6 +64,12 @@ The worker runs every 15 minutes, so new matches and PDFs can take up to about 2
 1. Check **Assessments**: status should be completed.
 2. If completed but not scored for more than 15 minutes, report it to the technical owner with the candidate name and instrument. (Technical: check `score_instrument` logs and the Vault secrets `project_url` and `edge_trigger_secret`; a missing secret logs a warning and skips the call. If `net._http_response` shows 403 `forbidden`, check that Vault `edge_trigger_secret` exists (migration 004) and that the deployed `score_instrument` is the version that checks it. The worker still scores these within 15 minutes.)
 
+### T-21b A candidate's earlier results are not in the Assessments list, or a professional sees different tests
+The assessments were replaced by battery v0.2 on 2026-10-25, and professionals now take their own adult version. Sessions on the earlier version stay, and their results still show on the **Profile** tab, but the **Assessments** list shows only the current tests. A candidate who started before the change sees the new tests as "Not started". Ask them to take the new ones; the profile and matches use the latest result of each kind.
+
+### T-21c An aptitude area shows no score
+Only the areas in the candidate's version are scored: mechanical and speed and accuracy are in the Class 8–12 versions, logical reasoning in Class 11–12 and professional. Stream suggestions skip an area the candidate did not take.
+
 ### T-22 "Only counsellor_notes can be edited"
 Swadharma points come from the engine; you can only edit the notes field.
 

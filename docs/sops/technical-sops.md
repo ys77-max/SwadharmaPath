@@ -2,7 +2,7 @@
 
 Procedures for developers and the technical owner.
 
-> Last updated 2026-10-24. Worker moved to GitHub Actions (free timer) instead of Railway (SOP-T1, T4, T5, T7). First admin is created in Supabase Auth, not by signing up (SOP-T1 step 4). Library expansion (SOP-T3) and demo cases (SOP-T9).
+> Last updated 2026-10-24. Worker moved to GitHub Actions (free timer) instead of Railway (SOP-T1, T4, T5, T7). First admin is created in Supabase Auth, not by signing up (SOP-T1 step 4). Library expansion (SOP-T3) and demo cases (SOP-T9). 2026-10-25: assessment battery v0.2 (SOP-T3, T9).
 
 | ID | SOP |
 |---|---|
@@ -60,10 +60,11 @@ Procedures for developers and the technical owner.
 
 ## SOP-T3 Regenerating seed data
 
-1. Add new careers and streams to `supabase/seed/library_more.py`; edit `supabase/seed/instruments.py` for instruments. Leave the first 20 careers and 8 streams in `library.py` as they are: they were seeded by `001_init.sql`, which is already applied in production.
-2. Run `python3 supabase/seed/build_seed.py`. It rewrites the seed block of `001_init.sql` (which must not change; check `git diff`) and all of `003_library_expansion.sql`.
+1. Add new careers and streams to `supabase/seed/library_more.py`; edit `supabase/seed/instruments_v2.py` for the assessment battery (`instruments.py` holds the retired 0.1 placeholders that 001 seeded; leave it alone). Leave the first 20 careers and 8 streams in `library.py` as they are: they were seeded by `001_init.sql`, which is already applied in production.
+2. Run `python3 supabase/seed/build_seed.py`. It rewrites the seed block of `001_init.sql` (which must not change; check `git diff`) and all of `003_library_expansion.sql` and `005_assessment_battery.sql`.
 3. Run the worker tests (every entry is validated like a CSV upload) and the SQL tests. Commit the generated SQL with the source change.
-4. To add library content to a live database after 003 has run, write a new migration (rows insert only when the name is new), or let admins add rows with **Upload edited CSV** so each new entry is reviewed.
+4. A change to battery content is a new version: bump `VERSION` in `instruments_v2.py` and copy the 005 pattern into a new migration that sets the old version inactive and inserts the new one. Never change items of a version that candidates have already answered, since their results refer to it.
+5. To add library content to a live database after 003 has run, write a new migration (rows insert only when the name is new), or let admins add rows with **Upload edited CSV** so each new entry is reviewed.
 
 ## SOP-T4 Worker operations
 
@@ -113,14 +114,14 @@ Demo cases let staff try every screen without real families. They live in the li
 | Login | Who | State |
 |---|---|---|
 | `demo.counsellor@example.com` | Demo Counsellor (Meera), role counsellor | Assigned to every demo case |
-| `demo.class9@example.com` | Aarav, Class 9, CBSE, early explorer | All six junior activities done, subject marks, one session held, one booked |
+| `demo.class9@example.com` | Aarav, Class 9, CBSE, early explorer | All seven junior activities done (battery v0.2), subject marks, one session held, one booked |
 | `demo.class10@example.com` | Ananya, Class 10, ICSE, early explorer | Same |
 | `demo.class11@example.com` | Rohan, Class 11 Science (PCM + CS), CBSE | All six standard assessments done, sessions |
 | `demo.class12@example.com` | Kavya, Class 12 Commerce with Maths, Telangana board | Same |
-| `demo.earlycareer@example.com` | Neha, 2 years in accounts | Same |
+| `demo.earlycareer@example.com` | Neha, 2 years in accounts | All seven adult assessments done, including career anchors and readiness for change, sessions |
 | `demo.midcareer@example.com` | Vikram, 12 years in manufacturing | Same |
 | `test.junior@example.com` | Test Junior Candidate, Class 8 | Nothing taken: try the junior activities yourself |
-| `test.senior@example.com` | Test Senior Candidate, 5 years' experience | Nothing taken: try the standard assessments yourself |
+| `test.senior@example.com` | Test Senior Candidate, 5 years' experience | Nothing taken: try the adult (professional) assessments yourself |
 
 Disclaimer and guardian consent are pre-recorded for every demo candidate, because the onboarding screen is not built yet.
 
@@ -128,7 +129,7 @@ Disclaimer and guardian consent are pre-recorded for every demo candidate, becau
 
 1. Pick one password for all demo accounts (at least 8 characters). Do not reuse a real password; it will be shared with testers.
 2. `python3 supabase/seed/build_demo.py --password '<password>' > /tmp/demo.sql`, or take `supabase/seed/demo_cases.sql` and replace `__DEMO_PASSWORD__` with the password
-3. Run the file in the Supabase SQL editor. It is safe to run twice.
+3. Run the file in the Supabase SQL editor. It is safe to run twice. Session ids include the battery version, so running it again after a new battery adds completed sessions on the new version; earlier ones stay.
 4. Scores appear within seconds (the Edge Function); profiles, career matches and stream suggestions appear after the next Worker run (every 15 minutes, or run **Actions → Worker** by hand).
 
 **Remove**

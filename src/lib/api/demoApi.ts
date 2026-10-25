@@ -112,7 +112,9 @@ export const demoApi: Api = {
     return wait({ candidate: c, user: d.users.find((u) => u.id === c.user_id) ?? null, parent: d.users.find((u) => u.id === c.parent_user_id) ?? null })
   },
   async instrumentsFor(variant) {
-    return wait(d.instruments.filter((i) => i.track_variant === variant))
+    // demo data has no adult battery; professionals see the standard one
+    const v = variant === 'adult' ? 'standard' : variant
+    return wait(d.instruments.filter((i) => i.track_variant === v))
   },
   async assessmentSessions(cid) {
     return wait(d.assessmentSessions.filter((s) => s.candidate_id === cid).map(({ responses, ...s }) => ({ ...s, answered: Object.keys(responses).length })))
@@ -374,7 +376,7 @@ export const demoApi: Api = {
   async myInstruments() {
     const c = myCand()
     if (!c) return []
-    const variant = c.track === 'early_explorer' ? 'junior' : 'standard'
+    const variant = c.track === 'early_explorer' ? 'junior' : 'standard'  // demo data has no adult battery
     return wait(d.instruments.filter((i) => i.track_variant === variant).map((i) => {
       const s = d.assessmentSessions.filter((x) => x.candidate_id === c.id && x.instrument_id === i.id && x.status !== 'invalidated').at(-1)
       const n = flatItems(i.id).length

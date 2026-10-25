@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { api } from '@/lib/api'
+import { variantFor } from '@/lib/constants'
 import type { AssessmentSession } from '@/lib/types'
 import { useAsync } from '@/lib/useAsync'
 import { fmtDate } from '@/lib/utils'
@@ -22,7 +23,7 @@ export const VALIDITY_LABEL: Record<string, string> = {
 
 export default function AssessmentsTab({ bundle }: TabProps) {
   const c = bundle.candidate
-  const variant = c.track === 'early_explorer' ? 'junior' : 'standard'
+  const variant = variantFor(c.track)
   const { data, error, loading, reload } = useAsync(async () => {
     const [instruments, sessions, results] = await Promise.all([api.instrumentsFor(variant), api.assessmentSessions(c.id), api.assessmentResults(c.id)])
     return { instruments, sessions, results }

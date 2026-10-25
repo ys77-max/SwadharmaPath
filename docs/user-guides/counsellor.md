@@ -30,7 +30,7 @@ Key facts, consent status (disclaimer, guardian, Swadharma), progress and upcomi
 - **Re-administer** an instrument when results are invalid: confirm in the dialog, the old session is invalidated and the candidate gets a fresh one. The row shows how many earlier attempts were invalidated.
 
 ### Profile
-Charts of interests, aptitude percentiles and work-style graphs (others / stress / self). Edit the plain-language narrative (summary, strengths, watch-outs, themes) and **Approve**. Until you approve, the candidate and parent cannot see any results.
+Charts of interests, aptitude percentiles for every area the candidate took (Class 8–10: six areas including mechanical and speed and accuracy; Class 11–12: seven, adding logical reasoning; professionals: five), work-style graphs (others / stress / self), Big Five and values. For professionals a further card shows **career anchors** (what they will not give up: expertise, management, autonomy, security, building something, service, challenge, lifestyle) and **readiness for change** (concern, control, curiosity, confidence), each as a 1–5 mean. Norms are placeholders until real results build up, so read percentiles as indicative and lean on the pattern across tests. Edit the plain-language narrative (summary, strengths, watch-outs, themes) and **Approve**. Until you approve, the candidate and parent cannot see any results.
 
 ### Swadharma 🔒
 Visible only to you and admins, and only if the candidate opted in with consent.
