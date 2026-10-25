@@ -1,5 +1,7 @@
 export type Role = 'candidate' | 'parent' | 'counsellor' | 'admin'
 export type Track = 'early_explorer' | 'student' | 'professional'
+/** Instrument version a track takes: Class 8-10 junior, Class 11-12 standard, professionals adult. */
+export type TrackVariant = 'junior' | 'standard' | 'adult'
 export type IcccStage = 'know_self' | 'know_world' | 'decide' | 'plan' | 'act' | 'review'
 export type ReportKind = 'candidate' | 'candidate_junior' | 'parent' | 'stream_choice' | 'case_file' | 'swadharma'
 export type Visibility = 'counsellor' | 'candidate' | 'parent' | 'all'
@@ -64,7 +66,7 @@ export interface InstrumentMeta {
   code: string
   name: string
   version: string
-  track_variant: 'junior' | 'standard'
+  track_variant: TrackVariant
   time_limit_min: number | null
   is_active: boolean
 }

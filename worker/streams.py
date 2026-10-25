@@ -16,7 +16,7 @@ from typing import Any
 from families import FAMILY_RIASEC
 from match import cosine
 
-STREAM_VERSION = "streams-0.2"
+STREAM_VERSION = "streams-0.3"
 ANY_BOARD = "Any board"
 # First case-insensitive substring match of the stream name wins, so order matters.
 APTITUDE_PAIRS = [
@@ -24,13 +24,13 @@ APTITUDE_PAIRS = [
     ("PCM", ["numerical", "abstract"]),
     ("PCB", ["verbal", "abstract"]),
     ("NIOS Science", ["numerical", "abstract"]),
-    ("Commerce", ["numerical", "verbal"]),
+    ("Commerce", ["numerical", "verbal", "perceptual"]),
     ("Fine Arts", ["spatial", "verbal"]),
     ("Humanities", ["verbal", "abstract"]),
     ("Design", ["spatial", "abstract"]),
-    ("Vocational", ["spatial", "abstract"]),
-    ("Polytechnic", ["numerical", "spatial"]),
-    ("ITI Trade", ["spatial", "abstract"]),
+    ("Vocational", ["spatial", "mechanical", "abstract"]),
+    ("Polytechnic", ["numerical", "spatial", "mechanical"]),
+    ("ITI Trade", ["spatial", "mechanical"]),
 ]
 STREAM_SUBJECTS = [
     ("PCMB", ["maths", "science"]),

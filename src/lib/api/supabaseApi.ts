@@ -74,8 +74,9 @@ export const supabaseApi: Api = {
       parent: users.find((u) => u.id === candidate.parent_user_id) ?? null,
     }
   },
-  async instrumentsFor(variant) {
-    return must(await supabase.from('instruments').select(INSTRUMENT_COLS).eq('track_variant', variant).eq('is_active', true)) as InstrumentMeta[]
+  async instrumentsFor(variant, includeRetired = false) {
+    const q = supabase.from('instruments').select(INSTRUMENT_COLS).eq('track_variant', variant)
+    return must(await (includeRetired ? q : q.eq('is_active', true))) as InstrumentMeta[]
   },
   async assessmentSessions(candidateId) {
     return must(await supabase.from('assessment_sessions').select(SESSION_COLS).eq('candidate_id', candidateId).order('started_at', { ascending: false })) as AssessmentSession[]

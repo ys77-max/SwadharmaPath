@@ -9,7 +9,7 @@ import { api } from '@/lib/api'
 import { useTrack } from '@/lib/track'
 import { useAsync } from '@/lib/useAsync'
 
-const EMOJI: Record<string, string> = { interest: '🎨', subject_enjoyment: '📚', aptitude: '🧩', workstyle: '🤝', school_values: '💛', values: '🧭', learning: '💡', bigfive: '🌱' }
+const EMOJI: Record<string, string> = { interest: '🎨', subject_enjoyment: '📚', aptitude: '🧩', workstyle: '🤝', school_values: '💛', values: '🧭', learning: '💡', bigfive: '🌱', career_anchors: '⚓', adaptability: '🧗' }
 
 export default function AssessList() {
   const { copy, junior } = useTrack()

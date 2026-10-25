@@ -4,14 +4,14 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api'
-import { ICCC } from '@/lib/constants'
+import { ICCC, variantFor } from '@/lib/constants'
 import { useAsync } from '@/lib/useAsync'
 import { ageFrom, fmtDate, fmtDateTime } from '@/lib/utils'
 import type { TabProps } from './types'
 
 export default function OverviewTab({ bundle, onGo }: TabProps & { onGo: (tab: string) => void }) {
   const { candidate: c, user, parent } = bundle
-  const variant = c.track === 'early_explorer' ? 'junior' : 'standard'
+  const variant = variantFor(c.track)
   const { data, loading } = useAsync(async () => {
     const [instruments, sessions, profile, sess, roadmap, matches] = await Promise.all([
       api.instrumentsFor(variant),

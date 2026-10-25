@@ -14,7 +14,8 @@ and remove. The password is never written to the repo: pass it on the command li
 
 Loading is idempotent (fixed ids, "on conflict do nothing"). Completed sessions are inserted
 in progress and then marked completed, so the database trigger calls the scoring Edge Function
-straight away; the worker's next polling run builds profiles and matches.
+straight away; the worker's next polling run builds profiles and matches. Session ids include the
+battery version, so loading again after a new battery adds sessions on it (earlier ones stay).
 See docs/sops/technical-sops.md SOP-T9.
 """
 from __future__ import annotations
@@ -29,13 +30,19 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from instruments import all_instruments  # noqa: E402
+from instruments_v2 import VERSION, all_instruments  # noqa: E402
 
 NS = uuid.UUID("5b0c2a8e-1d7f-4a8e-9b51-2f6f6c0d5e11")
 DOMAIN = "example.com"
 PLACEHOLDER = "__DEMO_PASSWORD__"
-JUNIOR = ["interest", "aptitude", "workstyle", "school_values", "learning", "subject_enjoyment"]
-STANDARD = ["interest", "aptitude", "workstyle", "values", "learning", "bigfive"]
+BATTERY = {
+    "junior": ["interest", "aptitude", "bigfive", "workstyle", "school_values", "learning", "subject_enjoyment"],
+    "standard": ["interest", "aptitude", "bigfive", "workstyle", "values", "learning"],
+    "adult": ["interest", "aptitude", "bigfive", "workstyle", "values", "career_anchors", "adaptability"],
+}
+VARIANT = {"early_explorer": "junior", "student": "standard", "professional": "adult"}
+# aptitude areas a persona does not list follow a related one
+APT_FALLBACK = {"mechanical": "spatial", "logical": "abstract"}
 
 
 def uid(key: str) -> str:
@@ -53,14 +60,15 @@ def lit(v) -> str:
 COUNSELLOR = {"key": "counsellor", "email": f"demo.counsellor@{DOMAIN}", "name": "Demo Counsellor (Meera)"}
 
 # riasec: liking 1-5 per letter; apt: chance of a right answer per section; ws: most -> least like me;
-# values: most -> least important; learn: 1-5 per style; big5: 1-5 per trait; subj: enjoyment, marks
+# values: most -> least important; learn: 1-5 per style; big5: 1-5 per trait; subj: enjoyment, marks;
+# anchors / adapt (professionals): 1-5 per career anchor / adaptability scale
 PERSONAS = [
     dict(key="class9", email=f"demo.class9@{DOMAIN}", name="Demo Aarav Sharma (Class 9)", track="early_explorer", board="CBSE",
          dob="2011-08-14", gender="male", city="Pune", school="Demo Public School, Pune", cls="Class 9", stream=None,
          academics={"class_8_percent": 88}, constraints={}, complete=True,
          riasec=dict(R=4, I=5, A=2, S=2, E=3, C=3), apt=dict(numerical=0.9, verbal=0.6, abstract=0.85, spatial=0.75),
          ws="RDPA", values=["Learning new things", "Winning", "Having freedom", "Making my family proud", "Being creative", "Being kind"],
-         learn=dict(visual=4, auditory=2, reading=3, kinesthetic=5),
+         learn=dict(visual=4, auditory=2, reading=3, kinesthetic=5), big5=dict(O=4, C=3, E=3, A=3, N=3),
          subj=dict(maths=(5, 92), science=(5, 90), computers=(4, 85), languages=(2, 70), social_science=(2, 68), art=(2, 65), sports=(4, None)),
          note="Loves robotics club and maths olympiad; parents hope for engineering."),
     dict(key="class10", email=f"demo.class10@{DOMAIN}", name="Demo Ananya Iyer (Class 10)", track="early_explorer", board="ICSE",
@@ -68,7 +76,7 @@ PERSONAS = [
          academics={"class_9_percent": 84}, constraints={}, complete=True,
          riasec=dict(R=2, I=3, A=5, S=4, E=3, C=2), apt=dict(numerical=0.5, verbal=0.9, abstract=0.7, spatial=0.8),
          ws="APRD", values=["Being creative", "Being kind", "Having freedom", "Learning new things", "Making my family proud", "Winning"],
-         learn=dict(visual=5, auditory=4, reading=3, kinesthetic=3),
+         learn=dict(visual=5, auditory=4, reading=3, kinesthetic=3), big5=dict(O=5, C=3, E=4, A=4, N=3),
          subj=dict(maths=(2, 66), science=(3, 74), computers=(3, 80), languages=(5, 93), social_science=(4, 86), art=(5, 95), sports=(2, None)),
          note="Draws comics and runs the school magazine; unsure whether Science is expected of her."),
     dict(key="class11", email=f"demo.class11@{DOMAIN}", name="Demo Rohan Mehta (Class 11 Science)", track="student", board="CBSE",
@@ -91,6 +99,8 @@ PERSONAS = [
          riasec=dict(R=1, I=4, A=3, S=3, E=4, C=4), apt=dict(numerical=0.8, verbal=0.75, abstract=0.75, spatial=0.5),
          ws="RADP", values=["Learning", "Achievement", "Independence", "Variety", "Recognition", "Creativity", "Security", "Work-life balance", "Leadership", "Helping others"],
          learn=dict(visual=4, auditory=3, reading=4, kinesthetic=3), big5=dict(O=5, C=4, E=3, A=3, N=3),
+         anchors=dict(technical=3, managerial=3, autonomy=4, security=2, entrepreneurial=3, service=2, challenge=5, lifestyle=3),
+         adapt=dict(concern=4, control=3, curiosity=5, confidence=3),
          note="Bored with month-end closing; drawn to analytics or product roles. Wants to switch within a year."),
     dict(key="mid", email=f"demo.midcareer@{DOMAIN}", name="Demo Vikram Singh (12 yrs, Mechanical)", track="professional", board=None,
          dob="1988-01-09", gender="male", city="Gurugram", school="Demo Auto Components Ltd (Production Manager)", cls="12 years", stream="Manufacturing operations",
@@ -98,6 +108,8 @@ PERSONAS = [
          riasec=dict(R=4, I=3, A=2, S=4, E=5, C=3), apt=dict(numerical=0.8, verbal=0.7, abstract=0.6, spatial=0.85),
          ws="RPAD", values=["Leadership", "Helping others", "Work-life balance", "Security", "Achievement", "Recognition", "Learning", "Independence", "Variety", "Creativity"],
          learn=dict(visual=4, auditory=4, reading=2, kinesthetic=5), big5=dict(O=3, C=4, E=4, A=4, N=2),
+         anchors=dict(technical=3, managerial=5, autonomy=2, security=4, entrepreneurial=2, service=4, challenge=3, lifestyle=4),
+         adapt=dict(concern=4, control=4, curiosity=3, confidence=4),
          note="Plateaued in plant operations; considering supply-chain leadership, EV manufacturing, or training and teaching."),
     # Fresh accounts with nothing taken yet, for trying the candidate screens yourself.
     dict(key="test_junior", email=f"test.junior@{DOMAIN}", name="Test Junior Candidate", track="early_explorer", board="CBSE",
@@ -125,7 +137,9 @@ def responses(p: dict, code: str, variant: str, rng: random.Random) -> dict:
         if code == "interest":
             a = _clip(p["riasec"][item["scale"]] + rng.choice([-1, 0, 0, 0, 1]))
         elif code == "aptitude":
-            right = rng.random() < p["apt"].get(item["scale"], 0.5)
+            area = item["scale"]
+            chance = p["apt"].get(area, p["apt"].get(APT_FALLBACK.get(area, ""), 0.65))
+            right = rng.random() < chance
             wrong = [o["value"] for o in item["options"] if o["value"] != item["key"]]
             a = item["key"] if right else rng.choice(wrong)
         elif t == "forced_choice":
@@ -141,6 +155,8 @@ def responses(p: dict, code: str, variant: str, rng: random.Random) -> dict:
             base = p["big5"].get(item["scale"], 3)
             v = _clip(base + rng.choice([-1, 0, 0, 1]))
             a = 6 - v if item.get("reverse") else v
+        elif code in ("career_anchors", "adaptability"):
+            a = _clip(p["anchors" if code == "career_anchors" else "adapt"].get(item["scale"], 3) + rng.choice([-1, 0, 0, 1]))
         elif code == "subject_enjoyment":
             a = p["subj"].get(item["scale"], (3, None))[0]
         else:
@@ -188,12 +204,13 @@ on conflict (id) do nothing;
 """)
         if not p["complete"]:
             continue
-        variant = "junior" if p["track"] == "early_explorer" else "standard"
+        variant = VARIANT[p["track"]]
         if variant == "junior":
             rows = ", ".join(f"('{cand}', {lit(s)}, {e}, {lit(m)})" for s, (e, m) in p["subj"].items() if s not in ("computers", "sports") or m)
             sql.append(f"insert into public.subject_enjoyment (candidate_id, subject, enjoyment, marks_pct) values {rows}\non conflict do nothing;\n")
-        for code in (JUNIOR if variant == "junior" else STANDARD):
-            sid = uid(f"{p['key']}:{code}")
+        for code in BATTERY[variant]:
+            # the battery version is part of the id, so reloading after a new battery adds fresh sessions
+            sid = uid(f"{p['key']}:{code}:{VERSION}")
             resp = responses(p, code, variant, rng)
             sql.append(f"""insert into public.assessment_sessions (id, candidate_id, instrument_id, started_at, responses, status)
 select '{sid}', '{cand}', i.id, now() - interval '3 days', {lit(resp)}, 'in_progress'

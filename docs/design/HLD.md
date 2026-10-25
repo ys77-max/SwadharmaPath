@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Document | HLD |
-| Version | 1.5 |
+| Version | 1.7 |
 | Last updated | 2026-10-24 |
 | Code baseline | `feat/start-here`: database, Edge Functions, web app (Start Here routes) and worker. |
 | Related | [BRD](../brd/BRD.md) · [LLD](LLD.md) |
@@ -61,7 +61,7 @@ flowchart TB
 | Compute away from the client | Scoring keys, norms and items never reach the browser in bulk. The runner fetches one item at a time via `next_item()`. All scoring runs in the worker (mirrored in the Edge Function for instant feedback). |
 | Counsellor in the loop | Results, profile, options and roadmap are drafts until a counsellor approves or publishes. |
 | Append-only where trust matters | `swadharma_releases` and `audit_log` deny UPDATE/DELETE/TRUNCATE for every role; reports are write-once and versioned. |
-| Track-aware UX | `early_explorer` gets junior instruments, stream recommendations, larger type and friendlier copy. |
+| Track-aware UX | Each track takes a battery tailored to its objective (`private.track_variant`): `early_explorer` → junior (stream choice), `student` → standard (course and career), `professional` → adult (growth or change, with career anchors and readiness for change). `early_explorer` also gets stream recommendations, larger type and friendlier copy. |
 
 ## 3. Components
 
@@ -77,7 +77,7 @@ flowchart TB
 
 Route guard: everything except the public routes needs a session; after login the user is sent to the home for `users.role` (`/me`, `/family`, `/cases`, `/admin`). Supabase client: `src/lib/supabase.ts`, configured from `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. All data access goes through one `Api` interface with a Supabase implementation and an in-memory demo implementation; demo mode (`VITE_DEMO_MODE=true`, or no Supabase variables) lets reviewers click through every role without a backend.
 
-### 3.2 Supabase database (*implemented in `supabase/migrations/001_init.sql`, `002_library_refresh_archive.sql` and `003_library_expansion.sql`*)
+### 3.2 Supabase database (*implemented in `supabase/migrations/001_init.sql` to `005_assessment_battery.sql`*)
 
 - 27 tables (23 from the spec plus `notifications`, `library_refresh_runs`, `library_refresh_proposals`, `archive_settings`), all with RLS.
 - `private` schema of `SECURITY DEFINER` helper functions used by policies so they never recurse.
@@ -86,7 +86,7 @@ Route guard: everything except the public routes needs a session; after login th
 - Candidate RPCs: `my_instruments`, `next_item`, `save_responses`, `complete_assessment`, `accept_disclaimer`, `give_guardian_consent`, `submit_birth_details`.
 - Admin RPCs: library refresh (`request_library_refresh`, `cancel_library_refresh`, `decide_refresh_proposal`, `apply_library_refresh`) and archiving (`archive_preview`, `archive_inactive`, `restore_archived`, `save_archive_settings`).
 - Triggers for signup, role guard, lead rate limit, under-18 gate, scoring call, roadmap guard, report immutability and versioning, Swadharma release and append-only tables.
-- Seed data: 148 careers with pathways across the 15 families and 43 stream options (CBSE, CISCE, state boards, NIOS, IB, Cambridge, polytechnic and ITI): 20 careers and 8 streams in 001, the rest in 003. Junior and standard instrument versions with placeholder items.
+- Seed data: 148 careers with pathways across the 15 families and 43 stream options (CBSE, CISCE, state boards, NIOS, IB, Cambridge, polytechnic and ITI): 20 careers and 8 streams in 001, the rest in 003. Assessment battery v0.2 (migration 005, original items, placeholder norms): junior 167, standard 265 and adult 277 questions; the 0.1 placeholders stay for old sessions but are inactive.
 - Demo cases (optional, `supabase/seed/build_demo.py`): sign-in accounts for a demo counsellor, six candidates from Class 9 to mid-career with completed assessments, and two fresh test candidates. Loaded and removed by SQL ([SOP-T9](../sops/technical-sops.md#sop-t9-demo-cases)).
 
 ### 3.3 Edge Functions (*implemented*)
@@ -284,5 +284,6 @@ erDiagram
 | 1.2 | 2026-10-24 | Production go-live: Supabase project created and seeded, Edge Functions deployed, Vercel project linked to the repo with `vercel.json` for SPA routing and headers |
 | 1.3 | 2026-10-24 | Library refresh (AI via Claude API or CSV, admin approval, rematch) and archiving (admin timeframe, nightly auto-archive, restore): components, flows 4.4–4.5, jobs, security, deployment (`ANTHROPIC_API_KEY`) |
 | 1.5 | 2026-10-24 | Library expansion (migration 003) and optional demo cases |
+| 1.7 | 2026-10-25 | Assessment battery v0.2 tailored to the objective, with a new adult variant for professionals (migration 005) |
 | 1.6 | 2026-10-24 | Instant scoring: the assessment trigger authenticates to `score_instrument` with a dedicated shared secret (migration 004) |
 | 1.4 | 2026-10-24 | Worker hosted on GitHub Actions (timer, public-log mode) instead of Railway; matches and reports refresh every 15 minutes rather than every minute (scoring stays instant through the Edge Function) |

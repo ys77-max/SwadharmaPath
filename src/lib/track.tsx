@@ -7,7 +7,7 @@ export const COPY = {
     steps: ['Onboard', 'Assess', 'Sessions', 'Options', 'Roadmap'],
     stepHints: [
       'Your profile, academics and consent',
-      'Six short assessments, at your own pace',
+      'Six assessments for choosing a course and career, at your own pace',
       'One-to-one sessions with your counsellor',
       'Careers ranked for you, with pathways',
       'A dated plan you can track',
@@ -50,6 +50,13 @@ export const COPY = {
 }
 export type Copy = (typeof COPY)['standard']
 
+/** Professionals take the adult battery, aimed at growing in or changing a career. */
+const PROFESSIONAL: Copy = {
+  ...COPY.standard,
+  stepHints: COPY.standard.stepHints.map((h, i) => (i === 1 ? 'Seven assessments on your strengths, motivators and readiness for a move' : h)),
+  assessIntro: 'These look at where you could grow or move next: interests, reasoning, personality, work style, values, what you want from a career and how ready you are for change. Only the reasoning section has right answers. Progress saves automatically.',
+}
+
 interface TrackState {
   track: Track
   setTrack: (t: Track) => void
@@ -67,7 +74,7 @@ export function TrackProvider({ children }: { children: ReactNode }) {
     document.documentElement.dataset.track = track
   }, [track])
 
-  const value = useMemo(() => ({ track, setTrack, junior, copy: junior ? COPY.early_explorer : COPY.standard }), [track, junior])
+  const value = useMemo(() => ({ track, setTrack, junior, copy: junior ? COPY.early_explorer : track === 'professional' ? PROFESSIONAL : COPY.standard }), [track, junior])
   return <TrackContext.Provider value={value}>{children}</TrackContext.Provider>
 }
 

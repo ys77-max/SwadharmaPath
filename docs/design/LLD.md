@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Document | LLD |
-| Version | 1.4 |
+| Version | 1.6 |
 | Last updated | 2026-10-24 |
 | Code baseline | `feat/start-here`: migration, Edge Functions, web app and worker (Start Here scope). |
 | Related | [BRD](../brd/BRD.md) · [HLD](HLD.md) |
@@ -20,8 +20,9 @@
 | `supabase/migrations/001_init.sql` | Schema, constraints, helpers, RLS, triggers, views, RPCs, storage, generated seed | implemented |
 | `supabase/migrations/002_library_refresh_archive.sql` | Library refresh tables and RPCs, archiving columns, settings, RPCs and pg_cron job; `v_caseload` and `assessment_gate` replaced to respect archiving | implemented |
 | `supabase/migrations/003_library_expansion.sql` | Generated: 128 more careers with pathways and 35 more stream options, each inserted only if no row of that name exists | implemented |
+| `supabase/migrations/005_assessment_battery.sql` | Generated from `instruments_v2.py`: `private.track_variant()`, instrument code and variant checks widened (adult; career_anchors, adaptability), 0.1 placeholders set inactive, 20 v0.2 instruments inserted if missing, `my_instruments` uses the new mapping | implemented |
 | `supabase/migrations/004_trigger_secret.sql` | Creates Vault `edge_trigger_secret` (random, if missing); `private.invoke_edge_function` sends it as the `x-trigger-secret` header (plus the `service_role_key` bearer if that exists); `public.verify_trigger_secret(text)` (service role only) | implemented |
-| `supabase/seed/` | `build_seed.py` (writes the 001 seed block and 003), `instruments.py`, `library.py` (first 20 careers / 8 streams as `CAREERS_V1` / `STREAMS_V1`; `CAREERS` / `STREAMS` are the full library), `library_more.py` (the 003 content), `build_demo.py` (demo cases SQL, not a migration) and its committed output `demo_cases.sql` with a `__DEMO_PASSWORD__` placeholder | implemented |
+| `supabase/seed/` | `build_seed.py` (writes the 001 seed block, 003 and 005), `instruments.py` (0.1 placeholders, kept for 001), `instruments_v2.py` (battery v0.2: original items; numerical, series and speed-and-accuracy questions generated with a fixed seed; option order shuffled so keys vary), `library.py` (first 20 careers / 8 streams as `CAREERS_V1` / `STREAMS_V1`; `CAREERS` / `STREAMS` are the full library), `library_more.py` (the 003 content), `build_demo.py` (demo cases SQL, not a migration) and its committed output `demo_cases.sql` with a `__DEMO_PASSWORD__` placeholder | implemented |
 | `supabase/tests/` | `run.sh` (applies every migration in order), stub, fixtures, `rls_test.sql`, `owner_test.sql`, `library_archive_test.sql`, `archive_owner_test.sql` | implemented |
 | `supabase/functions/_shared/` | `scoring.ts` (TS scorer), `scoring_fixtures.json` (shared with the worker), `workstyle_templates.json`, `cors.ts` | implemented |
 | `supabase/functions/score_instrument/` | Edge Function | implemented |
@@ -57,7 +58,7 @@ All tables are in `public`, have `id uuid default gen_random_uuid()` unless keye
 | `leads` | `archived_at`, `archived_by` (002); `source` ∈ web, whatsapp, referral, school, walk_in; `track` ∈ early_explorer, student, professional; `stage` default `new` ∈ new, contacted, discovery, paid, active, completed, lost; `assigned_counsellor` → users; `next_followup` date; `converted_candidate` → candidates |
 | `candidates` | `archived_at`, `archived_by` (002); `user_id`, `lead_id`, `parent_user_id`, `counsellor_id`; `track`; `board`, `dob`, `gender`, `city`, `school_or_employer`, `class_or_years_exp`, `stream_or_function`; `academics`, `constraints` jsonb; `status` default `onboarding`; `swadharma_opted_in` bool; `disclaimer_accepted_at`, `guardian_consent_at` |
 | `birth_details` 🔒 | PK `candidate_id`; `birth_date`, `birth_time`, `time_certainty` ∈ exact, approx_15m, approx_1h, unknown; `birth_place`, `lat`, `lng`, `tz`; `consent_given_by`, `consent_at`, `consent_text_version` |
-| `instruments` | `code` ∈ interest, aptitude, workstyle, bigfive, values, learning, school_values, subject_enjoyment; `version`; `track_variant` ∈ junior, standard; `items`, `scoring_spec`, `norms` jsonb (hidden from API roles); `time_limit_min`; `is_active` |
+| `instruments` | `code` ∈ interest, aptitude, workstyle, bigfive, values, learning, school_values, subject_enjoyment, career_anchors, adaptability; `version` (active battery `0.2-original`); `track_variant` ∈ junior, standard, adult; `items`, `scoring_spec`, `norms` jsonb (hidden from API roles); `time_limit_min`; `is_active` |
 | `assessment_sessions` | `candidate_id`, `instrument_id`; `started_at`, `completed_at`; `responses` jsonb (`{item_id: {a, rt}, _meta: {section_started: {code: ts}}}`); `status` ∈ in_progress, completed, invalidated; `device`, `duration_sec` |
 | `assessment_results` | `raw`, `percentiles`, `derived`, `validity_flags` jsonb; `scored_at`, `scoring_version` |
 | `profile_summary` | PK `candidate_id`; `interest_vector`, `aptitude_vector`, `workstyle_vector`, `values_vector` numeric[]; `narrative` jsonb; `approved_by`, `approved_at`, `updated_at` (trigger) |
@@ -179,7 +180,7 @@ C = candidate (own), P = parent (linked), Co = assigned counsellor, A = admin, S
 
 | RPC | Input | Output | Rules |
 |---|---|---|---|
-| `my_instruments()` | — | rows: instrument_id, code, name, track_variant, time_limit_min, item_count, est_minutes, session_id, status, answered | Active instruments for caller's track variant (early_explorer → junior); latest non-invalidated session; est = time limit or 12 s per item |
+| `my_instruments()` | — | rows: instrument_id, code, name, track_variant, time_limit_min, item_count, est_minutes, session_id, status, answered | Active instruments for caller's track variant (`private.track_variant`: early_explorer → junior, student → standard, professional → adult); latest non-invalidated session; est = time limit or 12 s per item |
 | `next_item(session_id, position?)` | uuid, int | `{done, position, total, section{code,name,time_limit_sec,started_at,server_now,index,count}, item{id,type,prompt,options[{value,label}]}, answer}` | Caller must own the session and it must be in progress. Null position = first unanswered. Timed section: clock starts on first served item (stored server-side in `responses._meta.section_started`); once `now() >= started + limit` it skips to the next section (no grace); going back before the furthest answered item raises 22023 |
 | `save_responses(session_id, responses)` | uuid, `{item_id: {a, rt}}` | int (saved count) | Drops unknown items and answers in timed sections whose clock is not started or ended more than 30 s ago |
 | `complete_assessment(session_id, device?)` | uuid, text | void | Sets completed, `completed_at`, `duration_sec`; fires scoring trigger |
@@ -226,7 +227,9 @@ Responses are `{item_id: {a, rt}}`; `_meta` is ignored. Age bands 13–15, 16–
 | `workstyle` | workstyle | Forced choice most/least over factors R (Results), A (Affiliative), P (Paced), D (Detail). With N valid items: others = (most − N/4)/(3N/4)·19, stress = (N/4 − least)/(3N/4)·19, self = (most − least)/N·19, each clamped ±19. Junior keeps others and self only. Primary/secondary = highest positive self values. Style table from `workstyle_templates.json` |
 | `bigfive` | bigfive | Mean per domain (reverse-keyed 6 − a) → percentiles; `SD` scale gives social desirability |
 | `values` | values, school_values | Pair wins per value → ranking, `top5` (`scoring_spec.top`), vector = wins/appearances |
-| `likert_scales` | learning, subject_enjoyment | Mean per scale (sum when `per_item`) → order and top |
+| `likert_scales` | learning, subject_enjoyment, career_anchors, adaptability | Mean per scale (sum when `per_item`) → order and top |
+
+Battery v0.2 per variant (questions): junior: interest 36, subject_enjoyment 7, aptitude 48 (numerical, verbal, abstract, spatial, mechanical, perceptual; 8 each, 4 min each, perceptual 3 min), bigfive 33 (30 + 3 social desirability), workstyle 12, school_values 15, learning 16. Standard: interest 60, aptitude 56 (adds logical; 5 min per area, perceptual 3), bigfive 64 (60 + 4), workstyle 24, values 45, learning 16. Adult: interest 48, aptitude 40 (numerical, verbal, abstract, spatial, logical; 4 min each), bigfive 64, workstyle 24 (with the stress graph), values 45, career_anchors 32 (technical, managerial, autonomy, security, entrepreneurial, service, challenge, lifestyle), adaptability 24 (concern, control, curiosity, confidence). The adult variant scores like standard (only `junior` changes work-style graphs). `profile_summary.aptitude_vector` keeps the four core areas; all areas stay in `assessment_results.percentiles`.
 
 Work-style patterns: span wide ≥ 20 / crunched ≤ 8; reversal (primary of others ≠ primary of self); undershift (all self ≤ 2); overshift (≥ 3 positive); mercurial (A − max(R, P, D) ≥ 8); flick_up / flick_down (P, D < 0 and D > P / D < P). Standard only, stress: P moves ≥ 3 self→stress = personal, self→others = performance; A moving ≥ 3 the same way = relationship.
 
@@ -250,14 +253,15 @@ constraints   = 0 when the career's family is in candidates.constraints.exclude_
 
 The interest vector comes from `profile_summary` (falls back to the latest interest result). Top 15 by fit are upserted into `career_matches` with `rank`, `match_version`, and `breakdown {interest, aptitude, workstyle, values, outlook, constraints, explanation{…}, swadharma?}`. Re-runs keep `counsellor_action` and `visible_to_candidate`; rows that drop out of the top 15 are deleted only when the counsellor has not acted on them and they are unpublished.
 
-### 9.3 Stream recommendation (`worker/streams.py`, `streams-0.2`) — early_explorer
+### 9.3 Stream recommendation (`worker/streams.py`, `streams-0.3`) — early_explorer
 
 ```
 stream_fit = 35·cosine(interest_vector, mean RIASEC profile of the families the stream keeps open)
            + 30·mean aptitude percentile of the stream's sub-tests / 100
                (PCMB numerical+abstract+verbal; PCM numerical+abstract; PCB verbal+abstract;
-                NIOS Science numerical+abstract; Commerce numerical+verbal; Fine Arts spatial+verbal;
-                Humanities verbal+abstract; Design/Vocational/ITI Trade spatial+abstract; Polytechnic numerical+spatial)
+                NIOS Science numerical+abstract; Commerce numerical+verbal+perceptual; Fine Arts spatial+verbal;
+                Humanities verbal+abstract; Design spatial+abstract; Vocational spatial+mechanical+abstract;
+                ITI Trade spatial+mechanical; Polytechnic numerical+spatial+mechanical; areas the candidate did not take are skipped)
            + 20·mean over key subjects of (marks % and (enjoyment − 1)/4)
            + 10·keeps_open count / widest count
            + 5·board match (the candidate's board or "Any board")
@@ -376,3 +380,4 @@ Any change to policies, triggers or RPCs needs a matching SQL test. `run.sh` sto
 | 1.3 | 2026-10-24 | Worker on GitHub Actions: `--run` groups, `WORKER_PUBLIC_LOGS`, `worker.yml` schedule |
 | 1.4 | 2026-10-24 | Migration 003 library expansion (148 careers, 43 streams); `streams-0.2` board filter and new lookup keys; `build_demo.py`; `run.sh` fails on migration errors |
 | 1.5 | 2026-10-24 | Migration 004: trigger calls to Edge Functions authenticate with Vault `edge_trigger_secret`, checked by `public.verify_trigger_secret`, instead of relying on the Vault service-role key |
+| 1.6 | 2026-10-25 | Migration 005 assessment battery v0.2 (junior, standard, adult; career_anchors and adaptability), `private.track_variant`, `instruments_v2.py`, `streams-0.3` aptitude keys, demo cases on v0.2 |

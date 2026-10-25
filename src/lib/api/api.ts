@@ -3,7 +3,7 @@ import type {
   RefreshRun, RefreshScope, AssessmentResult, AssessmentSession, BirthDetailsSummary, CaseloadRow, Candidate, Career, CareerMatch,
   CounsellingSession, DocumentFile, InstrumentMeta, MyInstrument, Narrative, NextItem, ProfileSummary, Report,
   ReportKind, Roadmap, RoadmapItem, RoadmapTemplate, StreamMatch, StreamOption, SwadharmaChart, SwadharmaRelease,
-  SwadharmaScore, Visibility,
+  SwadharmaScore, TrackVariant, Visibility,
 } from '../types'
 
 export interface CaseBundle {
@@ -37,7 +37,8 @@ export interface Api {
   // counsellor workspace
   caseload(): Promise<CaseloadRow[]>
   getCase(candidateId: string): Promise<CaseBundle>
-  instrumentsFor(variant: 'junior' | 'standard'): Promise<InstrumentMeta[]>
+  /** Active instruments for a variant; includeRetired also returns earlier versions (to label old results). */
+  instrumentsFor(variant: TrackVariant, includeRetired?: boolean): Promise<InstrumentMeta[]>
   assessmentSessions(candidateId: string): Promise<AssessmentSession[]>
   assessmentResults(candidateId: string): Promise<AssessmentResult[]>
   reAdminister(sessionId: string): Promise<void>

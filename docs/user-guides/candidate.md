@@ -37,7 +37,15 @@ Your counsellor or the agency usually creates your account after your enquiry. I
 
 ## 4. Taking assessments (/me/assess)
 
-The list shows each assessment, its status (not started, in progress, completed) and an estimated time.
+The list shows each assessment, its status (not started, in progress, completed) and an estimated time. What you take depends on your stage and what you are deciding:
+
+| You are | Aim | Assessments | Questions, time |
+|---|---|---|---|
+| Class 8–10 | Choosing a Class 11 stream | What I like doing, Subjects I enjoy, Brain games (numbers, words, patterns, shapes, how things work, speed and accuracy), About me, How I like to work, What matters to me, How I learn | About 167, roughly 60 minutes |
+| Class 11–12 | Choosing a course and career | Interests, Aptitude (the six areas above plus reasoning), Personality, Work style, Work values, How I learn | About 265, roughly 90 minutes |
+| Working professional | Growing in or changing your career | Work interests, Reasoning and aptitude (numbers, words, patterns, shapes, reasoning), Personality, Work style, Work values, What I want from my career, Readiness for change | About 277, roughly 60–70 minutes |
+
+You do not have to finish in one sitting: each assessment saves on its own, so you can do one or two a day.
 
 - One question is shown per screen, with a progress bar. You can answer with the mouse or the keyboard (number keys pick an option, Enter moves on). Work-style questions ask you to pick the statement **most** like you and the one **least** like you.
 - Your answers **save automatically** every 30 seconds and when you move on. You can close the browser and come back; press **Resume** to continue where you left off.

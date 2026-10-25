@@ -1,4 +1,4 @@
-import type { IcccStage, ReportKind, RoadmapKind, RoadmapTemplate, Track } from './types'
+import type { IcccStage, ReportKind, RoadmapKind, RoadmapTemplate, Track, TrackVariant } from './types'
 
 export const DISCLAIMER =
   'SwadharmaPath supports career decisions; it does not make them. Psychometric results describe tendencies at a point in time and are interpreted by a trained counsellor; they are not a measure of worth or a guarantee of success. The Swadharma (Vedic astrology) analysis is a traditional lens offered for reflection; it has no established scientific validity, is never used to rule out any career, and is shared only with your consent. Decisions remain yours and your family’s.'
@@ -172,4 +172,30 @@ export const APTITUDE_LABEL: Record<string, string> = {
   verbal: 'Verbal',
   abstract: 'Abstract',
   spatial: 'Spatial',
+  mechanical: 'Mechanical',
+  perceptual: 'Speed and accuracy',
+  logical: 'Logical reasoning',
+}
+
+/** Mirrors private.track_variant() in the database. */
+export function variantFor(track: Track): TrackVariant {
+  return track === 'early_explorer' ? 'junior' : track === 'professional' ? 'adult' : 'standard'
+}
+
+export const ANCHOR_LABEL: Record<string, string> = {
+  technical: 'Technical expertise',
+  managerial: 'General management',
+  autonomy: 'Autonomy',
+  security: 'Security and stability',
+  entrepreneurial: 'Building something own',
+  service: 'Service to a cause',
+  challenge: 'Pure challenge',
+  lifestyle: 'Lifestyle fit',
+}
+
+export const ADAPTABILITY_LABEL: Record<string, string> = {
+  concern: 'Concern (planning ahead)',
+  control: 'Control (owning decisions)',
+  curiosity: 'Curiosity (exploring options)',
+  confidence: 'Confidence (making it work)',
 }
